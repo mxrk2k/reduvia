@@ -47,8 +47,12 @@ export interface Transaction {
 
 export interface Budget {
   id: string;
+  user_id: string;
   category: TransactionCategory;
-  limit: number;
+  monthly_limit: number;
+  created_at: string;
+}
+
+export interface BudgetWithSpending extends Budget {
   spent: number;
-  period: "monthly" | "weekly" | "yearly";
 }

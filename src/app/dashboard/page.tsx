@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Separator } from "@/components/ui/separator";
 import { SummaryCards } from "./_components/summary-cards";
@@ -32,7 +33,13 @@ export default async function DashboardPage() {
       <header className="sticky top-0 z-10 border-b bg-background">
         <div className="mx-auto flex h-14 max-w-4xl items-center justify-between px-4">
           <h1 className="text-lg font-semibold">Finance Tracker</h1>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            <Link
+              href="/budgets"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Budgets
+            </Link>
             <ThemeToggle />
             <LogoutButton />
           </div>
