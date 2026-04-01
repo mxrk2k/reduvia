@@ -35,6 +35,8 @@ export const EXPENSE_CATEGORIES: TransactionCategory[] = [
   "other",
 ];
 
+export type RecurringFrequency = "weekly" | "monthly" | "yearly";
+
 export interface Transaction {
   id: string;
   user_id: string;
@@ -43,6 +45,9 @@ export interface Transaction {
   category: TransactionCategory;
   description: string;
   created_at: string;
+  is_recurring: boolean;
+  recurring_frequency: RecurringFrequency | null;
+  next_due_date: string | null;
 }
 
 export interface Budget {

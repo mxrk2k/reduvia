@@ -33,14 +33,21 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import type { TransactionCategory } from "@/types";
+import type { TransactionCategory, RecurringFrequency } from "@/types";
 
-const schema = z.object({
-  type: z.enum(["income", "expense"]),
-  amount: z.coerce.number().positive("Amount must be greater than 0"),
-  category: z.string().min(1, "Please select a category"),
-  description: z.string().min(1, "Description is required").max(100),
-});
+const schema = z
+  .object({
+    type:                z.enum(["income", "expense"]),
+    amount:              z.coerce.number().positive("Amount must be greater than 0"),
+    category:            z.string().min(1, "Please select a category"),
+    description:         z.string().min(1, "Description is required").max(100),
+    is_recurring:        z.boolean(),
+    recurring_frequency: z.enum(["weekly", "monthly", "yearly"]).optional(),
+  })
+  .refine((d) => !d.is_recurring || !!d.recurring_frequency, {
+    message: "Please select a frequency",
+    path: ["recurring_frequency"],
+  });
 
 type FormValues = z.infer<typeof schema>;
 
@@ -51,20 +58,31 @@ export function AddTransactionDialog() {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as Resolver<FormValues>,
-    defaultValues: { type: "expense", amount: 0, category: "", description: "" },
+    defaultValues: {
+      type:                "expense",
+      amount:              0,
+      category:            "",
+      description:         "",
+      is_recurring:        false,
+      recurring_frequency: undefined,
+    },
   });
 
-  const selectedType = form.watch("type");
-  const categories =
-    selectedType === "income" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+  const selectedType  = form.watch("type");
+  const isRecurring   = form.watch("is_recurring");
+  const categories    = selectedType === "income" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
 
   async function onSubmit(values: FormValues) {
     setServerError(null);
     const result = await addTransaction({
-      type: values.type,
-      amount: values.amount,
-      category: values.category as TransactionCategory,
-      description: values.description,
+      type:                values.type,
+      amount:              values.amount,
+      category:            values.category as TransactionCategory,
+      description:         values.description,
+      is_recurring:        values.is_recurring,
+      recurring_frequency: values.is_recurring
+        ? (values.recurring_frequency as RecurringFrequency)
+        : undefined,
     });
     if (result?.error) {
       setServerError(result.error);
@@ -76,8 +94,13 @@ export function AddTransactionDialog() {
   }
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setServerError(null); }}>
-      {/* Base UI DialogTrigger uses render prop instead of asChild */}
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (!o) setServerError(null);
+      }}
+    >
       <DialogTrigger render={<Button size="sm" />}>
         <Plus className="mr-2 h-4 w-4" />
         Add Transaction
@@ -93,7 +116,8 @@ export function AddTransactionDialog() {
             {serverError && (
               <p className="text-sm font-medium text-destructive">{serverError}</p>
             )}
-            {/* Type — Base UI Select controlled via Controller */}
+
+            {/* Type */}
             <Controller
               control={form.control}
               name="type"
@@ -132,20 +156,14 @@ export function AddTransactionDialog() {
                 <FormItem>
                   <FormLabel>Amount ($)</FormLabel>
                   <FormControl>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0.01"
-                      placeholder="0.00"
-                      {...field}
-                    />
+                    <Input type="number" step="0.01" min="0.01" placeholder="0.00" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            {/* Category — Base UI Select */}
+            {/* Category */}
             <Controller
               control={form.control}
               name="category"
@@ -187,6 +205,67 @@ export function AddTransactionDialog() {
                 </FormItem>
               )}
             />
+
+            {/* Recurring toggle */}
+            <FormField
+              control={form.control}
+              name="is_recurring"
+              render={({ field }) => (
+                <FormItem>
+                  <div className="flex items-center gap-2 rounded-md border px-3 py-2.5">
+                    <input
+                      type="checkbox"
+                      id="is_recurring"
+                      checked={field.value}
+                      onChange={(e) => {
+                        field.onChange(e.target.checked);
+                        if (!e.target.checked) {
+                          form.setValue("recurring_frequency", undefined);
+                        }
+                      }}
+                      className="h-4 w-4 accent-primary cursor-pointer"
+                    />
+                    <FormLabel
+                      htmlFor="is_recurring"
+                      className="cursor-pointer font-normal text-sm mb-0"
+                    >
+                      Make this recurring
+                    </FormLabel>
+                  </div>
+                </FormItem>
+              )}
+            />
+
+            {/* Frequency — shown only when recurring is checked */}
+            {isRecurring && (
+              <Controller
+                control={form.control}
+                name="recurring_frequency"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel>Frequency</FormLabel>
+                    <Select
+                      value={field.value ?? ""}
+                      onValueChange={field.onChange}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="weekly">Weekly</SelectItem>
+                        <SelectItem value="monthly">Monthly</SelectItem>
+                        <SelectItem value="yearly">Yearly</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {fieldState.error && (
+                      <p className="text-sm font-medium text-destructive">
+                        {fieldState.error.message}
+                      </p>
+                    )}
+                  </FormItem>
+                )}
+              />
+            )}
 
             <div className="flex justify-end gap-2 pt-2">
               <Button

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Trash2 } from "lucide-react";
+import { Trash2, Repeat2 } from "lucide-react";
 
 import { deleteTransaction } from "@/app/actions/transactions";
 import { formatCurrency, formatDate } from "@/lib/formatters";
@@ -52,13 +52,22 @@ export function TransactionList({ transactions }: TransactionListProps) {
           {/* Description + meta */}
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium">{t.description}</p>
-            <div className="mt-0.5 flex items-center gap-2">
+            <div className="mt-0.5 flex flex-wrap items-center gap-2">
               <Badge variant="secondary" className="text-xs capitalize">
                 {t.category}
               </Badge>
               <span className="text-xs text-muted-foreground">
                 {formatDate(t.created_at)}
               </span>
+              {t.is_recurring && (
+                <Badge
+                  variant="outline"
+                  className="gap-1 text-xs capitalize text-muted-foreground"
+                >
+                  <Repeat2 className="h-3 w-3" />
+                  {t.recurring_frequency}
+                </Badge>
+              )}
             </div>
           </div>
 

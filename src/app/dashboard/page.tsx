@@ -7,6 +7,7 @@ import { SpendingChart } from "./_components/spending-chart";
 import { TransactionList } from "./_components/transaction-list";
 import { AddTransactionDialog } from "./_components/add-transaction-dialog";
 import { LogoutButton } from "./_components/logout-button";
+import { DueSoon } from "./_components/due-soon";
 import { ThemeToggle } from "@/components/theme-toggle";
 import type { Transaction } from "@/types";
 
@@ -19,13 +20,36 @@ export default async function DashboardPage() {
 
   if (!user) redirect("/login");
 
+  // All transactions (for summary + charts)
   const { data: transactions } = await supabase
     .from("transactions")
     .select("*")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });
 
-  const txList = (transactions ?? []) as Transaction[];
+  // Recurring transactions due within the next 7 days
+  const today = new Date();
+  const sevenDaysLater = new Date(today);
+  sevenDaysLater.setDate(today.getDate() + 7);
+
+  function fmt(d: Date): string {
+    return [
+      d.getFullYear(),
+      String(d.getMonth() + 1).padStart(2, "0"),
+      String(d.getDate()).padStart(2, "0"),
+    ].join("-");
+  }
+
+  const { data: dueSoonRaw } = await supabase
+    .from("transactions")
+    .select("*")
+    .eq("user_id", user.id)
+    .eq("is_recurring", true)
+    .lte("next_due_date", fmt(sevenDaysLater))
+    .order("next_due_date", { ascending: true });
+
+  const txList  = (transactions  ?? []) as Transaction[];
+  const dueSoon = (dueSoonRaw    ?? []) as Transaction[];
 
   return (
     <div className="min-h-screen bg-muted/40">
@@ -53,6 +77,9 @@ export default async function DashboardPage() {
           <h2 className="text-2xl font-bold tracking-tight">Dashboard</h2>
           <p className="text-sm text-muted-foreground">{user.email}</p>
         </div>
+
+        {/* Due soon — only rendered when there is data */}
+        <DueSoon transactions={dueSoon} />
 
         {/* Summary cards */}
         <SummaryCards transactions={txList} />
