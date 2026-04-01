@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Search, X } from "lucide-react";
+import { Search, X, Download } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -58,6 +58,45 @@ export function TransactionSection({
     setCategoryFilter("all");
   }
 
+  function exportCSV() {
+    const today = new Date();
+    const dateStamp = [
+      today.getFullYear(),
+      String(today.getMonth() + 1).padStart(2, "0"),
+      String(today.getDate()).padStart(2, "0"),
+    ].join("-");
+
+    const header = ["Date", "Type", "Category", "Description", "Amount"];
+
+    const rows = transactions.map((t) => {
+      const date = t.created_at.slice(0, 10);
+      const amount = t.type === "income"
+        ? Number(t.amount)
+        : -Number(t.amount);
+      // Wrap any field that contains a comma or quote in double-quotes;
+      // escape internal double-quotes by doubling them.
+      const escape = (s: string) =>
+        /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+      return [
+        date,
+        t.type,
+        escape(t.category),
+        escape(t.description),
+        amount.toFixed(2),
+      ].join(",");
+    });
+
+    const csv  = [header.join(","), ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url  = URL.createObjectURL(blob);
+
+    const a    = document.createElement("a");
+    a.href     = url;
+    a.download = `reduvia-transactions-${dateStamp}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="space-y-4">
       {/* Section header */}
@@ -70,7 +109,18 @@ export function TransactionSection({
               : `${transactions.length} transaction${transactions.length !== 1 ? "s" : ""}`}
           </p>
         </div>
-        <AddTransactionDialog />
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={exportCSV}
+            disabled={transactions.length === 0}
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Export CSV
+          </Button>
+          <AddTransactionDialog />
+        </div>
       </div>
 
       {/* Filter controls */}
