@@ -4,8 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Separator } from "@/components/ui/separator";
 import { SummaryCards } from "./_components/summary-cards";
 import { SpendingChart } from "./_components/spending-chart";
-import { TransactionList } from "./_components/transaction-list";
-import { AddTransactionDialog } from "./_components/add-transaction-dialog";
+import { TransactionSection } from "./_components/transaction-section";
 import { LogoutButton } from "./_components/logout-button";
 import { DueSoon } from "./_components/due-soon";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -90,19 +89,7 @@ export default async function DashboardPage() {
         <Separator />
 
         {/* Transactions section */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-semibold">Transactions</h3>
-              <p className="text-sm text-muted-foreground">
-                {txList.length} transaction{txList.length !== 1 ? "s" : ""}
-              </p>
-            </div>
-            <AddTransactionDialog />
-          </div>
-
-          <TransactionList transactions={txList} />
-        </div>
+        <TransactionSection transactions={txList} />
       </main>
     </div>
   );
