@@ -1,8 +1,10 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  AreaChart, Area,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -49,7 +51,38 @@ function buildCategoryData(transactions: Transaction[]): ChartEntry[] {
     .sort((a, b) => b.value - a.value);
 }
 
-// ── Shared tooltip ────────────────────────────────────────────────────────────
+interface MonthlyEntry {
+  month: string;
+  income: number;
+  expenses: number;
+}
+
+function buildMonthlyTrends(transactions: Transaction[]): MonthlyEntry[] {
+  const now = new Date();
+  return Array.from({ length: 6 }, (_, i) => {
+    const date = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const label = date.toLocaleDateString("en-US", { month: "short" });
+
+    const monthTxs = transactions.filter((t) => {
+      const d = new Date(t.created_at);
+      return d.getFullYear() === year && d.getMonth() === month;
+    });
+
+    return {
+      month: label,
+      income: monthTxs
+        .filter((t) => t.type === "income")
+        .reduce((s, t) => s + Number(t.amount), 0),
+      expenses: monthTxs
+        .filter((t) => t.type === "expense")
+        .reduce((s, t) => s + Number(t.amount), 0),
+    };
+  });
+}
+
+// ── Tooltips ──────────────────────────────────────────────────────────────────
 
 function CustomTooltip({
   active,
@@ -88,18 +121,213 @@ function BarTooltip({
   );
 }
 
+function TrendTooltip({
+  active,
+  payload,
+  label,
+  isDark,
+}: {
+  active?: boolean;
+  // Recharts TooltipPayload is ReadonlyArray<TooltipPayloadEntry>; use readonly any[]
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  payload?: readonly any[];
+  label?: string;
+  isDark: boolean;
+}) {
+  if (!active || !payload?.length) return null;
+
+  const income   = payload.find((p) => p.name === "income");
+  const expenses = payload.find((p) => p.name === "expenses");
+
+  return (
+    <div
+      style={{
+        background:   isDark ? "#1e293b" : "#ffffff",
+        border:       `1px solid ${isDark ? "#334155" : "#e2e8f0"}`,
+        borderRadius: 8,
+        padding:      "10px 14px",
+        color:        isDark ? "#f1f5f9" : "#0f172a",
+        fontSize:     13,
+        minWidth:     140,
+        boxShadow:    "0 4px 12px rgba(0,0,0,0.15)",
+      }}
+    >
+      <p style={{ fontWeight: 600, marginBottom: 6 }}>{label}</p>
+      {income && (
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 3 }}>
+          <span style={{ color: isDark ? "#6ee7b7" : "#059669" }}>Income</span>
+          <span style={{ fontWeight: 600, fontVariantNumeric: "tabular-nums", color: isDark ? "#10b981" : "#059669" }}>
+            {formatCurrency(income.value)}
+          </span>
+        </div>
+      )}
+      {expenses && (
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+          <span style={{ color: isDark ? "#fda4af" : "#e11d48" }}>Expenses</span>
+          <span style={{ fontWeight: 600, fontVariantNumeric: "tabular-nums", color: isDark ? "#f43f5e" : "#e11d48" }}>
+            {formatCurrency(expenses.value)}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Custom active dot (glow ring) ─────────────────────────────────────────────
+
+function ActiveDot({
+  cx,
+  cy,
+  fill,
+}: {
+  cx?: number;
+  cy?: number;
+  fill?: string;
+}) {
+  if (cx === undefined || cy === undefined) return null;
+  return (
+    <g>
+      <circle cx={cx} cy={cy} r={9} fill={fill} opacity={0.2} />
+      <circle cx={cx} cy={cy} r={5} fill={fill} stroke="white" strokeWidth={1.5} />
+    </g>
+  );
+}
+
+// ── Monthly trends chart ──────────────────────────────────────────────────────
+
+function MonthlyTrendsChart({
+  trendData,
+  isDark,
+}: {
+  trendData: MonthlyEntry[];
+  isDark: boolean;
+}) {
+  const monthsWithData = trendData.filter(
+    (m) => m.income > 0 || m.expenses > 0
+  ).length;
+
+  const incomeColor   = isDark ? "#10b981" : "#059669";
+  const expenseColor  = isDark ? "#f43f5e" : "#e11d48";
+  const gridOpacity   = isDark ? 0.10 : 0.08;
+  const axisTextColor = isDark ? "#9ca3af" : "#6b7280";
+  const fillOpacity   = isDark ? 0.20 : 0.15;
+
+  if (monthsWithData < 2) {
+    return (
+      <div className="flex h-40 flex-col items-center justify-center gap-1 text-center">
+        <p className="text-sm font-medium text-muted-foreground">Not enough data yet</p>
+        <p className="text-xs text-muted-foreground">
+          Add transactions across at least 2 months to see trends
+        </p>
+      </div>
+    );
+  }
+
+  const gridColor = isDark
+    ? `rgba(255,255,255,${gridOpacity})`
+    : `rgba(0,0,0,${gridOpacity})`;
+
+  return (
+    <div className="h-52">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart
+          data={trendData}
+          margin={{ top: 8, right: 8, left: 8, bottom: 0 }}
+        >
+          <defs>
+            <linearGradient id="gradIncome" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%"  stopColor={incomeColor}  stopOpacity={fillOpacity} />
+              <stop offset="95%" stopColor={incomeColor}  stopOpacity={0} />
+            </linearGradient>
+            <linearGradient id="gradExpenses" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%"  stopColor={expenseColor} stopOpacity={fillOpacity} />
+              <stop offset="95%" stopColor={expenseColor} stopOpacity={0} />
+            </linearGradient>
+          </defs>
+
+          <CartesianGrid
+            strokeDasharray="3 3"
+            stroke={gridColor}
+            vertical={false}
+          />
+          <XAxis
+            dataKey="month"
+            tick={{ fill: axisTextColor, fontSize: 11 }}
+            axisLine={false}
+            tickLine={false}
+          />
+          <YAxis
+            tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
+            tick={{ fill: axisTextColor, fontSize: 11 }}
+            axisLine={false}
+            tickLine={false}
+            width={36}
+          />
+          <Tooltip
+            content={({ active, payload, label }) => (
+              <TrendTooltip
+                active={active}
+                payload={payload}
+                label={label !== undefined ? String(label) : undefined}
+                isDark={isDark}
+              />
+            )}
+            cursor={{ stroke: gridColor, strokeWidth: 1 }}
+          />
+
+          <Area
+            type="monotone"
+            dataKey="income"
+            name="income"
+            stroke={incomeColor}
+            strokeWidth={2}
+            fill="url(#gradIncome)"
+            dot={{ r: 3, fill: incomeColor, strokeWidth: 0 }}
+            activeDot={<ActiveDot fill={incomeColor} />}
+          />
+          <Area
+            type="monotone"
+            dataKey="expenses"
+            name="expenses"
+            stroke={expenseColor}
+            strokeWidth={2}
+            fill="url(#gradExpenses)"
+            dot={{ r: 3, fill: expenseColor, strokeWidth: 0 }}
+            activeDot={<ActiveDot fill={expenseColor} />}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function SpendingChart({ transactions }: SpendingChartProps) {
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const update = () =>
+      setIsDark(document.documentElement.classList.contains("dark"));
+    update();
+    const observer = new MutationObserver(update);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+    return () => observer.disconnect();
+  }, []);
+
   const categoryData = buildCategoryData(transactions);
+  const trendData    = buildMonthlyTrends(transactions);
 
   const totalIncome   = transactions.filter((t) => t.type === "income")
     .reduce((s, t) => s + Number(t.amount), 0);
   const totalExpenses = transactions.filter((t) => t.type === "expense")
     .reduce((s, t) => s + Number(t.amount), 0);
 
-  const hasAnyData    = totalIncome > 0 || totalExpenses > 0;
-  const hasExpenses   = totalExpenses > 0;
+  const hasAnyData = totalIncome > 0 || totalExpenses > 0;
+  const hasExpenses = totalExpenses > 0;
 
   const barData = [{ name: "Overview", Income: totalIncome, Expenses: totalExpenses }];
 
@@ -166,6 +394,32 @@ export function SpendingChart({ transactions }: SpendingChartProps) {
                   </span>
                 </div>
               </div>
+            </div>
+
+            {/* ── Monthly trends ── */}
+            <Separator />
+            <div>
+              <p className="mb-3 text-sm font-medium text-muted-foreground">
+                Monthly Trends
+              </p>
+              {/* Legend */}
+              <div className="mb-3 flex gap-4">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span
+                    className="block h-0.5 w-4 rounded-full"
+                    style={{ backgroundColor: isDark ? "#10b981" : "#059669" }}
+                  />
+                  Income
+                </div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span
+                    className="block h-0.5 w-4 rounded-full"
+                    style={{ backgroundColor: isDark ? "#f43f5e" : "#e11d48" }}
+                  />
+                  Expenses
+                </div>
+              </div>
+              <MonthlyTrendsChart trendData={trendData} isDark={isDark} />
             </div>
 
             {/* ── Spending by category ── */}
