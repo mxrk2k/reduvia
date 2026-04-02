@@ -88,7 +88,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="w-full max-w-sm rounded-2xl p-8" style={glassStyle}>
+    <div className="w-full max-w-sm rounded-2xl p-6 sm:p-8" style={glassStyle}>
       {/* Header */}
       <div className="mb-7">
         <h2 className="text-xl font-semibold text-white">Welcome back</h2>

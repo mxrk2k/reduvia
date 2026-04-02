@@ -100,7 +100,7 @@ export function TransactionSection({
   return (
     <div className="space-y-4">
       {/* Section header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 className="text-lg font-semibold">Transactions</h3>
           <p className="text-sm text-muted-foreground">
@@ -115,11 +115,12 @@ export function TransactionSection({
             size="sm"
             onClick={exportCSV}
             disabled={transactions.length === 0}
+            className="flex-1 min-h-[44px] sm:flex-none sm:min-h-0"
           >
             <Download className="mr-2 h-4 w-4" />
             Export CSV
           </Button>
-          <AddTransactionDialog />
+          <AddTransactionDialog triggerClassName="flex-1 min-h-[44px] sm:flex-none sm:min-h-0" />
         </div>
       </div>
 
@@ -127,7 +128,7 @@ export function TransactionSection({
       {transactions.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
           {/* Text search */}
-          <div className="relative min-w-48 flex-1">
+          <div className="relative w-full sm:min-w-48 sm:flex-1">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="Search by description or category…"
@@ -139,7 +140,7 @@ export function TransactionSection({
 
           {/* Type filter */}
           <Select value={typeFilter} onValueChange={(v) => v && setTypeFilter(v)}>
-            <SelectTrigger className="w-36">
+            <SelectTrigger className="w-full sm:w-36">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -151,7 +152,7 @@ export function TransactionSection({
 
           {/* Category filter */}
           <Select value={categoryFilter} onValueChange={(v) => v && setCategoryFilter(v)}>
-            <SelectTrigger className="w-40">
+            <SelectTrigger className="w-full sm:w-40">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -170,7 +171,7 @@ export function TransactionSection({
               variant="ghost"
               size="sm"
               onClick={clearFilters}
-              className="text-muted-foreground"
+              className="w-full text-muted-foreground sm:w-auto"
             >
               <X className="mr-1.5 h-4 w-4" />
               Clear

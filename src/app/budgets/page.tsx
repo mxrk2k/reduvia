@@ -50,11 +50,11 @@ export default async function BudgetsPage() {
     <div className="min-h-screen bg-muted/40">
       <header className="sticky top-0 z-10 border-b bg-background">
         <div className="mx-auto flex h-14 max-w-4xl items-center justify-between px-4">
-          <h1 className="text-lg font-semibold">Finance Tracker</h1>
-          <div className="flex items-center gap-3">
+          <h1 className="truncate text-base font-semibold sm:text-lg">Finance Tracker</h1>
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <Link
               href="/dashboard"
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              className="flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[44px] sm:min-h-0"
             >
               Dashboard
             </Link>
@@ -65,7 +65,7 @@ export default async function BudgetsPage() {
       </header>
 
       <main className="mx-auto max-w-4xl space-y-6 p-4 pt-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-2xl font-bold tracking-tight">Budgets</h2>
             <p className="text-sm text-muted-foreground">
@@ -74,6 +74,7 @@ export default async function BudgetsPage() {
           </div>
           <AddBudgetDialog
             existingCategories={budgetList.map((b) => b.category)}
+            triggerClassName="w-full min-h-[44px] sm:w-auto sm:min-h-0"
           />
         </div>
 

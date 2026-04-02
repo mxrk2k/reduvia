@@ -43,7 +43,7 @@ export function DueSoon({ transactions }: DueSoonProps) {
   return (
     <Card className="border-amber-300 dark:border-amber-800/60">
       <CardHeader className="pb-3">
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <CardTitle className="flex items-center gap-2 text-base font-semibold">
             <Repeat2 className="h-4 w-4 text-amber-500" />
             Recurring — Due Soon
@@ -54,7 +54,7 @@ export function DueSoon({ transactions }: DueSoonProps) {
               variant="outline"
               onClick={handleProcess}
               disabled={processing}
-              className="h-8 text-xs"
+              className="min-h-[44px] text-xs sm:min-h-0 sm:h-8"
             >
               <RefreshCw
                 className={`mr-1.5 h-3.5 w-3.5 ${processing ? "animate-spin" : ""}`}
@@ -117,7 +117,7 @@ export function DueSoon({ transactions }: DueSoonProps) {
               <div className="flex shrink-0 items-center gap-2">
                 <Badge
                   variant="outline"
-                  className="gap-1 text-xs capitalize text-muted-foreground"
+                  className="hidden gap-1 text-xs capitalize text-muted-foreground sm:flex"
                 >
                   <Repeat2 className="h-3 w-3" />
                   {t.recurring_frequency}

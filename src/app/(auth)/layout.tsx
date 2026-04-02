@@ -32,12 +32,12 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
 
       {/* Page content */}
       <div
-        className="relative flex min-h-screen flex-col items-center justify-center gap-7 p-4"
+        className="relative flex min-h-screen flex-col items-center justify-center gap-5 p-4 sm:gap-7"
         style={{ zIndex: 2 }}
       >
         {/* ── Reduvia title ── */}
         <h1
-          className="select-none text-center text-5xl font-bold tracking-[0.18em] text-white sm:text-6xl"
+          className="select-none text-center text-4xl font-bold tracking-[0.18em] text-white sm:text-5xl lg:text-6xl"
           style={{
             fontFamily: "var(--font-cinzel)",
             textShadow: [

@@ -84,7 +84,7 @@ export default function SignupPage() {
   // ── Email verification state (unchanged logic, restyled) ──────────────────
   if (verificationSent) {
     return (
-      <div className="w-full max-w-sm rounded-2xl p-8 text-center" style={glassStyle}>
+      <div className="w-full max-w-sm rounded-2xl p-6 text-center sm:p-8" style={glassStyle}>
         <div className="mb-4 text-4xl">✉️</div>
         <h2 className="text-xl font-semibold text-white">Check your email</h2>
         <p className="mt-3 text-sm leading-relaxed text-white/45">
@@ -103,7 +103,7 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="w-full max-w-sm rounded-2xl p-8" style={glassStyle}>
+    <div className="w-full max-w-sm rounded-2xl p-6 sm:p-8" style={glassStyle}>
       {/* Header */}
       <div className="mb-7">
         <h2 className="text-xl font-semibold text-white">Create an account</h2>

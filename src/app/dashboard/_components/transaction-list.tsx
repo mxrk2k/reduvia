@@ -85,7 +85,7 @@ export function TransactionList({ transactions }: TransactionListProps) {
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+            className="h-11 w-11 shrink-0 text-muted-foreground hover:text-destructive sm:h-8 sm:w-8"
             disabled={deletingId === t.id}
             onClick={() => handleDelete(t.id)}
           >

@@ -51,7 +51,7 @@ const schema = z
 
 type FormValues = z.infer<typeof schema>;
 
-export function AddTransactionDialog() {
+export function AddTransactionDialog({ triggerClassName }: { triggerClassName?: string }) {
   const [open, setOpen] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const router = useRouter();
@@ -101,7 +101,7 @@ export function AddTransactionDialog() {
         if (!o) setServerError(null);
       }}
     >
-      <DialogTrigger render={<Button size="sm" />}>
+      <DialogTrigger render={<Button size="sm" className={triggerClassName} />}>
         <Plus className="mr-2 h-4 w-4" />
         Add Transaction
       </DialogTrigger>

@@ -55,11 +55,11 @@ export default async function DashboardPage() {
       {/* Header */}
       <header className="sticky top-0 z-10 border-b bg-background">
         <div className="mx-auto flex h-14 max-w-4xl items-center justify-between px-4">
-          <h1 className="text-lg font-semibold">Finance Tracker</h1>
-          <div className="flex items-center gap-3">
+          <h1 className="truncate text-base font-semibold sm:text-lg">Finance Tracker</h1>
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <Link
               href="/budgets"
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[44px] sm:min-h-0 flex items-center"
             >
               Budgets
             </Link>

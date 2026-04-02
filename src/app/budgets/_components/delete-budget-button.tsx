@@ -21,7 +21,7 @@ export function DeleteBudgetButton({ budgetId }: { budgetId: string }) {
     <Button
       variant="ghost"
       size="icon"
-      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+      className="h-11 w-11 text-muted-foreground hover:text-destructive sm:h-8 sm:w-8"
       onClick={handleDelete}
       disabled={loading}
     >
