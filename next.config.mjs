@@ -5,6 +5,7 @@ const nextConfig = {
   experimental: { serverComponentsExternalPackages: ["pdf-parse"] },
   webpack: (config) => {
     config.externals = [...(config.externals || []), "pdf-parse"];
+    config.watchOptions = { ignored: ["**/mobile/**"] };
     return config;
   },
 };
