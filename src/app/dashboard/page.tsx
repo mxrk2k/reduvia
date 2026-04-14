@@ -7,7 +7,11 @@ import { SpendingChart } from "./_components/spending-chart";
 import { TransactionSection } from "./_components/transaction-section";
 import { LogoutButton } from "./_components/logout-button";
 import { DueSoon } from "./_components/due-soon";
+import { HamburgerMenu } from "./_components/hamburger-menu";
+import { OnboardingPopup } from "./_components/onboarding-popup";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { getBankAccounts } from "@/app/actions/bank-statements";
+import { getUserPreferences } from "@/app/actions/user-preferences";
 import type { Transaction } from "@/types";
 
 export default async function DashboardPage() {
@@ -47,15 +51,28 @@ export default async function DashboardPage() {
     .lte("next_due_date", fmt(sevenDaysLater))
     .order("next_due_date", { ascending: true });
 
+  // Bank accounts (for hamburger menu + onboarding check)
+  const [bankAccounts, preferences] = await Promise.all([
+    getBankAccounts(),
+    getUserPreferences(),
+  ]);
+
   const txList  = (transactions  ?? []) as Transaction[];
   const dueSoon = (dueSoonRaw    ?? []) as Transaction[];
+
+  // Show onboarding popup if user has no bank accounts and hasn't dismissed it
+  const showOnboarding =
+    bankAccounts.length === 0 && preferences?.dismiss_import_prompt !== true;
 
   return (
     <div className="min-h-screen bg-muted/40">
       {/* Header */}
       <header className="sticky top-0 z-10 border-b bg-background">
         <div className="mx-auto flex h-14 max-w-4xl items-center justify-between px-4">
-          <h1 className="truncate text-base font-semibold sm:text-lg">Finance Tracker</h1>
+          <div className="flex items-center gap-2">
+            <HamburgerMenu bankAccounts={bankAccounts} />
+            <h1 className="truncate text-base font-semibold sm:text-lg">Finance Tracker</h1>
+          </div>
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <Link
               href="/budgets"
@@ -91,6 +108,9 @@ export default async function DashboardPage() {
         {/* Transactions section */}
         <TransactionSection transactions={txList} />
       </main>
+
+      {/* Onboarding popup — client component, only mounts when needed */}
+      <OnboardingPopup initialShow={showOnboarding} />
     </div>
   );
 }
