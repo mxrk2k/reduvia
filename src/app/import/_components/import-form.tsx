@@ -14,7 +14,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { importBankStatement } from "@/app/actions/bank-statements";
 import type { ImportResult } from "@/app/actions/bank-statements";
-import { formatCurrency } from "@/lib/formatters";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
