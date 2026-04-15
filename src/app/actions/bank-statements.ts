@@ -119,11 +119,24 @@ export interface BankAccountAnalysis {
 export async function categorizeTransactions(
   transactions: ParsedTransaction[]
 ): Promise<CategorizedTransaction[]> {
+  function ruleBasedCategory(t: ParsedTransaction): TransactionCategory {
+    if (t.type === "income") return "salary";
+    const d = t.description.toLowerCase();
+    if (/grocery|food|restaurant|doordash|ubereats|chick.fil.a|heinen/.test(d)) return "food";
+    if (/lyft|uber|transport|parking|gas/.test(d)) return "transport";
+    if (/netflix|spotify|apple|playstation|gaming|entertainment/.test(d)) return "entertainment";
+    if (/amazon|walmart|target|shopping|klarna|ebay/.test(d)) return "shopping";
+    if (/rent|mortgage|housing|utilities|electric|internet|water/.test(d)) return "housing";
+    if (/hospital|pharmacy|gym|health|medical/.test(d)) return "health";
+    if (/tuition|university|college|course|education|kindle|book/.test(d)) return "education";
+    return "other";
+  }
+
   const fallback = (): CategorizedTransaction[] =>
     transactions.map((t) => ({
       ...t,
       clean_description: t.description,
-      category: "other" as TransactionCategory,
+      category: ruleBasedCategory(t),
     }));
 
   if (transactions.length === 0) return [];
