@@ -72,6 +72,7 @@ interface FormState {
   amount: string;
   category: TransactionCategory | "";
   description: string;
+  date: string; // YYYY-MM-DD
   is_recurring: boolean;
   recurring_frequency: RecurringFrequency | "";
 }
@@ -81,6 +82,7 @@ const EMPTY_FORM: FormState = {
   amount: "",
   category: "",
   description: "",
+  date: formatDateLocal(new Date()),
   is_recurring: false,
   recurring_frequency: "",
 };
@@ -99,11 +101,13 @@ export default function TransactionsScreen() {
   const [refreshing, setRefreshing]     = useState(false);
   const [deletingId, setDeletingId]     = useState<string | null>(null);
 
-  // Modal
-  const [modalVisible, setModalVisible]         = useState(false);
-  const [form, setForm]                         = useState<FormState>(EMPTY_FORM);
-  const [saving, setSaving]                     = useState(false);
-  const [formError, setFormError]               = useState<string | null>(null);
+  // Modal — shared between add and edit
+  const [modalVisible, setModalVisible]             = useState(false);
+  const [modalMode, setModalMode]                   = useState<"add" | "edit">("add");
+  const [editingId, setEditingId]                   = useState<string | null>(null);
+  const [form, setForm]                             = useState<FormState>(EMPTY_FORM);
+  const [saving, setSaving]                         = useState(false);
+  const [formError, setFormError]                   = useState<string | null>(null);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [showFreqPicker, setShowFreqPicker]         = useState(false);
 
@@ -143,20 +147,40 @@ export default function TransactionsScreen() {
     setDeletingId(null);
   }
 
-  // ── Add ───────────────────────────────────────────────────────────────────────
-
-  function openModal() {
-    setForm(EMPTY_FORM);
-    setFormError(null);
-    setShowCategoryPicker(false);
-    setShowFreqPicker(false);
-    setModalVisible(true);
-  }
+  // ── Modal helpers ─────────────────────────────────────────────────────────────
 
   function closeModal() {
     setModalVisible(false);
     setShowCategoryPicker(false);
     setShowFreqPicker(false);
+  }
+
+  function openAddModal() {
+    setForm(EMPTY_FORM);
+    setFormError(null);
+    setEditingId(null);
+    setModalMode("add");
+    setShowCategoryPicker(false);
+    setShowFreqPicker(false);
+    setModalVisible(true);
+  }
+
+  function openEditModal(t: Transaction) {
+    setForm({
+      type:                t.type,
+      amount:              String(t.amount),
+      category:            t.category,
+      description:         t.description,
+      date:                t.created_at.slice(0, 10),
+      is_recurring:        t.is_recurring,
+      recurring_frequency: t.recurring_frequency ?? "",
+    });
+    setFormError(null);
+    setEditingId(t.id);
+    setModalMode("edit");
+    setShowCategoryPicker(false);
+    setShowFreqPicker(false);
+    setModalVisible(true);
   }
 
   function setType(t: TransactionType) {
@@ -173,25 +197,39 @@ export default function TransactionsScreen() {
     if (!value) setShowFreqPicker(false);
   }
 
-  async function handleSave() {
-    setFormError(null);
+  // ── Validation ────────────────────────────────────────────────────────────────
+
+  function validateForm(): number | null {
     const amount = parseFloat(form.amount);
     if (!form.description.trim()) {
       setFormError("Description is required.");
-      return;
+      return null;
     }
     if (isNaN(amount) || amount <= 0) {
       setFormError("Enter a valid amount greater than 0.");
-      return;
+      return null;
     }
     if (!form.category) {
       setFormError("Please select a category.");
-      return;
+      return null;
+    }
+    if (!form.date || !/^\d{4}-\d{2}-\d{2}$/.test(form.date)) {
+      setFormError("Enter a valid date (YYYY-MM-DD).");
+      return null;
     }
     if (form.is_recurring && !form.recurring_frequency) {
       setFormError("Please select a frequency.");
-      return;
+      return null;
     }
+    return amount;
+  }
+
+  // ── Save (add) ────────────────────────────────────────────────────────────────
+
+  async function handleAdd() {
+    setFormError(null);
+    const amount = validateForm();
+    if (amount === null) return;
 
     setSaving(true);
     const { data: { user } } = await supabase.auth.getUser();
@@ -205,6 +243,7 @@ export default function TransactionsScreen() {
       amount,
       category:            form.category,
       description:         form.description.trim(),
+      created_at:          form.date,
       is_recurring:        form.is_recurring,
       recurring_frequency: freq,
       next_due_date:       freq ? calculateNextDueDate(freq) : null,
@@ -215,6 +254,42 @@ export default function TransactionsScreen() {
     closeModal();
     fetchTransactions();
   }
+
+  // ── Update (edit) ─────────────────────────────────────────────────────────────
+
+  async function handleUpdate() {
+    setFormError(null);
+    const amount = validateForm();
+    if (amount === null || !editingId) return;
+
+    setSaving(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setSaving(false); return; }
+
+    const freq = form.is_recurring ? (form.recurring_frequency as RecurringFrequency) : null;
+
+    const { error } = await supabase
+      .from("transactions")
+      .update({
+        type:                form.type,
+        amount,
+        category:            form.category,
+        description:         form.description.trim(),
+        created_at:          form.date,
+        is_recurring:        form.is_recurring,
+        recurring_frequency: freq,
+        next_due_date:       freq ? calculateNextDueDate(freq) : null,
+      })
+      .eq("id", editingId)
+      .eq("user_id", user.id);
+
+    setSaving(false);
+    if (error) { setFormError(error.message); return; }
+    closeModal();
+    fetchTransactions();
+  }
+
+  const handleSave = modalMode === "edit" ? handleUpdate : handleAdd;
 
   const availableCategories =
     form.type === "income" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
@@ -266,11 +341,21 @@ export default function TransactionsScreen() {
           {fmt(Number(t.amount))}
         </Text>
 
+        {/* Edit */}
+        <TouchableOpacity
+          onPress={() => openEditModal(t)}
+          disabled={isDeleting}
+          style={styles.iconBtn}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons name="pencil-outline" size={16} color={COLORS.muted} />
+        </TouchableOpacity>
+
         {/* Delete */}
         <TouchableOpacity
           onPress={() => confirmDelete(t)}
           disabled={isDeleting}
-          style={styles.deleteBtn}
+          style={styles.iconBtn}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           {isDeleting ? (
@@ -322,11 +407,11 @@ export default function TransactionsScreen() {
       />
 
       {/* FAB */}
-      <TouchableOpacity style={styles.fab} onPress={openModal} activeOpacity={0.85}>
+      <TouchableOpacity style={styles.fab} onPress={openAddModal} activeOpacity={0.85}>
         <Ionicons name="add" size={28} color="#fff" />
       </TouchableOpacity>
 
-      {/* ── Add Transaction Modal ── */}
+      {/* ── Add / Edit Transaction Modal ── */}
       <Modal
         visible={modalVisible}
         animationType="slide"
@@ -343,7 +428,9 @@ export default function TransactionsScreen() {
           >
             {/* Header */}
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Add Transaction</Text>
+              <Text style={styles.modalTitle}>
+                {modalMode === "edit" ? "Edit Transaction" : "Add Transaction"}
+              </Text>
               <TouchableOpacity
                 onPress={closeModal}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -404,6 +491,18 @@ export default function TransactionsScreen() {
               placeholderTextColor={COLORS.muted}
               value={form.description}
               onChangeText={(v) => setForm((p) => ({ ...p, description: v }))}
+            />
+
+            {/* Date */}
+            <Text style={styles.fieldLabel}>Date</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="YYYY-MM-DD"
+              placeholderTextColor={COLORS.muted}
+              keyboardType="numbers-and-punctuation"
+              value={form.date}
+              onChangeText={(v) => setForm((p) => ({ ...p, date: v }))}
+              maxLength={10}
             />
 
             {/* Category */}
@@ -549,7 +648,9 @@ export default function TransactionsScreen() {
                 {saving ? (
                   <ActivityIndicator size="small" color="#fff" />
                 ) : (
-                  <Text style={styles.saveBtnText}>Save</Text>
+                  <Text style={styles.saveBtnText}>
+                    {modalMode === "edit" ? "Save Changes" : "Save"}
+                  </Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -655,7 +756,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     flexShrink: 0,
   },
-  deleteBtn: {
+  iconBtn: {
     width: 32,
     height: 32,
     alignItems: "center",
