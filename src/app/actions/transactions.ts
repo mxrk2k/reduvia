@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isProUser } from "@/lib/stripe";
 import type { TransactionType, TransactionCategory, RecurringFrequency } from "@/types";
+import type { RecurringSuggestion } from "@/app/actions/insights";
 
 type ActionResult = { error: string } | null;
 
@@ -139,6 +140,53 @@ export async function deleteTransaction(id: string): Promise<ActionResult> {
     .delete()
     .eq("id", id)
     .eq("user_id", user.id);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/dashboard");
+  return null;
+}
+
+const VALID_TRANSACTION_CATEGORIES: TransactionCategory[] = [
+  "salary", "freelance", "investment", "gift",
+  "housing", "food", "transport", "entertainment",
+  "health", "education", "shopping", "utilities", "other",
+];
+
+/**
+ * Creates a recurring transaction entry from a RecurringSuggestion.
+ * Called from the import results UI when a user clicks "Add as Recurring".
+ */
+export async function addRecurringFromSuggestion(
+  suggestion: RecurringSuggestion
+): Promise<ActionResult> {
+  const supabase = createClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+  if (authError || !user) return { error: "Not authenticated" };
+
+  if (!(await isProUser(user.id))) {
+    return { error: "Recurring transactions are a Pro feature." };
+  }
+
+  const category: TransactionCategory = VALID_TRANSACTION_CATEGORIES.includes(
+    suggestion.category as TransactionCategory
+  )
+    ? (suggestion.category as TransactionCategory)
+    : "other";
+
+  const { error } = await supabase.from("transactions").insert({
+    user_id:             user.id,
+    type:                "expense",
+    amount:              suggestion.amount,
+    category,
+    description:         suggestion.merchant,
+    is_recurring:        true,
+    recurring_frequency: suggestion.frequency,
+    next_due_date:       calculateNextDueDate(suggestion.frequency),
+  });
 
   if (error) return { error: error.message };
 

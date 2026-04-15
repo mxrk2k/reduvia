@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { isProUser } from "@/lib/stripe";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ImportForm } from "./_components/import-form";
 
@@ -14,6 +15,8 @@ export default async function ImportPage() {
   } = await supabase.auth.getUser();
 
   if (!user) redirect("/login");
+
+  const isPro = await isProUser(user.id);
 
   return (
     <div className="min-h-screen bg-muted/40">
@@ -44,7 +47,7 @@ export default async function ImportPage() {
           </p>
         </div>
 
-        <ImportForm />
+        <ImportForm isPro={isPro} />
       </main>
     </div>
   );

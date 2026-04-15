@@ -47,6 +47,149 @@ export interface SpendingAnomaly {
   insight: string;
 }
 
+// ── detectAndSuggestRecurring ─────────────────────────────────────────────────
+
+/** Normalises a merchant description for grouping (case-insensitive, no punctuation). */
+function normalizeForGrouping(desc: string): string {
+  return desc
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 30);
+}
+
+/** Median of a numeric array. */
+function median(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0
+    ? (sorted[mid - 1] + sorted[mid]) / 2
+    : sorted[mid];
+}
+
+export interface RecurringSuggestion {
+  /** Stable client-side key */
+  id: string;
+  merchant: string;
+  amount: number;
+  frequency: "weekly" | "monthly" | "yearly";
+  /** 0-100 */
+  confidence: number;
+  category: string;
+  occurrences: number;
+}
+
+export async function detectAndSuggestRecurring(
+  transactions: BankTxInput[]
+): Promise<RecurringSuggestion[]> {
+  const supabase = createClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+  if (authError || !user) return [];
+
+  const expenses = transactions.filter((t) => t.type === "expense");
+  if (expenses.length < 2) return [];
+
+  // ── Fetch existing recurring transactions to avoid duplicate suggestions ────
+  const { data: existingRows } = await supabase
+    .from("transactions")
+    .select("description")
+    .eq("user_id", user.id)
+    .eq("is_recurring", true);
+
+  const existingKeys = new Set(
+    (existingRows ?? []).map((r) => normalizeForGrouping(r.description as string))
+  );
+
+  // ── Group expenses by normalised merchant name ──────────────────────────────
+  const groups: Record<string, BankTxInput[]> = {};
+  for (const tx of expenses) {
+    const key = normalizeForGrouping(tx.clean_description ?? tx.description);
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(tx);
+  }
+
+  const suggestions: RecurringSuggestion[] = [];
+
+  for (const [key, txs] of Object.entries(groups)) {
+    if (txs.length < 2)       continue; // need at least 2 occurrences
+    if (existingKeys.has(key)) continue; // already tracked
+
+    // Sort chronologically
+    const sorted = [...txs].sort((a, b) => a.date.localeCompare(b.date));
+
+    // ── Amount consistency check (within 10%) ────────────────────────────────
+    const amounts   = sorted.map((t) => Number(t.amount));
+    const avgAmount = amounts.reduce((s, v) => s + v, 0) / amounts.length;
+    const maxDev    = Math.max(...amounts.map((a) => Math.abs(a - avgAmount) / avgAmount));
+    if (maxDev > 0.10) continue;
+
+    // ── Interval analysis ────────────────────────────────────────────────────
+    const intervals: number[] = [];
+    for (let i = 1; i < sorted.length; i++) {
+      const ms = new Date(sorted[i].date).getTime() - new Date(sorted[i - 1].date).getTime();
+      intervals.push(Math.round(ms / 86_400_000)); // convert ms → days
+    }
+
+    const med = median(intervals);
+
+    // Classify: weekly 5-10d, monthly 25-35d, yearly 350-380d  (skip biweekly — no matching type)
+    let frequency: RecurringSuggestion["frequency"];
+    let targetInterval: number;
+
+    if (med >= 5 && med <= 10) {
+      frequency      = "weekly";
+      targetInterval = 7;
+    } else if (med >= 25 && med <= 35) {
+      frequency      = "monthly";
+      targetInterval = 30;
+    } else if (med >= 350 && med <= 380) {
+      frequency      = "yearly";
+      targetInterval = 365;
+    } else {
+      continue; // doesn't fit any known period
+    }
+
+    // ── Confidence ───────────────────────────────────────────────────────────
+    // Based on: interval consistency (low std-dev) + occurrence count
+    const variance    = intervals.reduce((s, v) => s + (v - targetInterval) ** 2, 0) / intervals.length;
+    const stdDev      = Math.sqrt(variance);
+    const intervalScore = Math.max(0, 100 - (stdDev / targetInterval) * 200);
+    const countBonus    = Math.min(25, (txs.length - 2) * 8); // up to +25 for 5+ occurrences
+    const confidence    = Math.round(Math.min(100, intervalScore * 0.75 + countBonus));
+
+    if (confidence < 55) continue;
+
+    // ── Most common category ─────────────────────────────────────────────────
+    const catCounts: Record<string, number> = {};
+    for (const t of txs) {
+      const cat = t.category ?? "other";
+      catCounts[cat] = (catCounts[cat] ?? 0) + 1;
+    }
+    const category = Object.entries(catCounts).sort((a, b) => b[1] - a[1])[0][0];
+
+    const merchant = sorted[0].clean_description ?? sorted[0].description;
+
+    suggestions.push({
+      id:          `${key}-${frequency}`,
+      merchant,
+      amount:      Math.round(avgAmount * 100) / 100,
+      frequency,
+      confidence,
+      category,
+      occurrences: txs.length,
+    });
+  }
+
+  // Return highest-confidence suggestions first, cap at 10
+  return suggestions
+    .sort((a, b) => b.confidence - a.confidence)
+    .slice(0, 10);
+}
+
 // ── analyzeBankStatement types ────────────────────────────────────────────────
 
 export interface BankStatementTopCategory {

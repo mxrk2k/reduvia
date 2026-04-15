@@ -17,7 +17,9 @@ import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { parsePdfStatement } from "@/lib/parsers";
 import { isProUser } from "@/lib/stripe";
+import { detectAndSuggestRecurring } from "@/app/actions/insights";
 import type { ParsedTransaction } from "@/lib/parsers";
+import type { RecurringSuggestion } from "@/app/actions/insights";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -59,6 +61,7 @@ export interface ImportResult {
   statementPeriod?: string;
   beginningBalance?: number;
   endingBalance?: number;
+  recurringSuggestions: RecurringSuggestion[];
 }
 
 export interface BankAccountSummary {
@@ -355,6 +358,18 @@ export async function importBankStatement(
     if (txError) throw new Error(`Failed to insert transactions: ${txError.message}`);
   }
 
+  // ── 8. Detect recurring patterns from the just-imported transactions ─────────
+  const recurringSuggestions = await detectAndSuggestRecurring(
+    categorized.map((t) => ({
+      date:              t.date,
+      description:       t.description,
+      clean_description: t.clean_description,
+      amount:            t.amount,
+      type:              t.type,
+      category:          t.category,
+    }))
+  );
+
   return {
     bankAccountId,
     bankName,
@@ -364,6 +379,7 @@ export async function importBankStatement(
     statementPeriod,
     beginningBalance,
     endingBalance,
+    recurringSuggestions,
   };
 }
 

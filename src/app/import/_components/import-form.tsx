@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { importBankStatement } from "@/app/actions/bank-statements";
+import { RecurringSuggestions } from "@/components/recurring-suggestions";
 import type { ImportResult } from "@/app/actions/bank-statements";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -35,7 +36,7 @@ function formatDateRange(from: string, to: string): string {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function ImportForm() {
+export function ImportForm({ isPro }: { isPro: boolean }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -105,57 +106,67 @@ export function ImportForm() {
   // ── Success state ──────────────────────────────────────────────────────
   if (result) {
     return (
-      <Card>
-        <CardContent className="flex flex-col items-center gap-4 py-10 text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30">
-            <CheckCircle2 className="h-7 w-7 text-emerald-600 dark:text-emerald-400" />
-          </div>
-
-          <div>
-            <h3 className="text-lg font-semibold">Import successful!</h3>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Your statement has been imported and categorized.
-            </p>
-          </div>
-
-          {/* Result summary */}
-          <div className="w-full max-w-sm rounded-lg border bg-muted/40 px-5 py-4 text-left space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Bank</span>
-              <span className="font-medium">{result.bankName}</span>
+      <div className="space-y-6">
+        <Card>
+          <CardContent className="flex flex-col items-center gap-4 py-10 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30">
+              <CheckCircle2 className="h-7 w-7 text-emerald-600 dark:text-emerald-400" />
             </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Transactions</span>
-              <span className="font-medium tabular-nums">{result.transactionCount}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Date range</span>
-              <span className="font-medium tabular-nums text-right">
-                {formatDateRange(result.dateFrom, result.dateTo)}
-              </span>
-            </div>
-          </div>
 
-          <div className="flex flex-col gap-2 w-full max-w-sm sm:flex-row">
-            <Link
-              href={`/bank/${result.bankAccountId}`}
-              className="inline-flex flex-1 items-center justify-center rounded-lg bg-primary px-2.5 text-sm font-medium text-primary-foreground whitespace-nowrap transition-all hover:bg-primary/80 h-8"
-            >
-              View Analysis
-            </Link>
-            <Button
-              variant="outline"
-              className="flex-1"
-              onClick={() => {
-                setResult(null);
-                setErrorMsg(null);
-              }}
-            >
-              Import Another
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+            <div>
+              <h3 className="text-lg font-semibold">Import successful!</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Your statement has been imported and categorized.
+              </p>
+            </div>
+
+            {/* Result summary */}
+            <div className="w-full max-w-sm rounded-lg border bg-muted/40 px-5 py-4 text-left space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Bank</span>
+                <span className="font-medium">{result.bankName}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Transactions</span>
+                <span className="font-medium tabular-nums">{result.transactionCount}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Date range</span>
+                <span className="font-medium tabular-nums text-right">
+                  {formatDateRange(result.dateFrom, result.dateTo)}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2 w-full max-w-sm sm:flex-row">
+              <Link
+                href={`/bank/${result.bankAccountId}`}
+                className="inline-flex flex-1 items-center justify-center rounded-lg bg-primary px-2.5 text-sm font-medium text-primary-foreground whitespace-nowrap transition-all hover:bg-primary/80 h-8"
+              >
+                View Analysis
+              </Link>
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  setResult(null);
+                  setErrorMsg(null);
+                }}
+              >
+                Import Another
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Recurring suggestions — only rendered when detection found patterns */}
+        {result.recurringSuggestions.length > 0 && (
+          <RecurringSuggestions
+            suggestions={result.recurringSuggestions}
+            isPro={isPro}
+          />
+        )}
+      </div>
     );
   }
 
