@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
+import { Suspense } from "react";
 import { ArrowLeft, Upload, Building2, Calendar, FileText, TrendingUp } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getBankAccountAnalysis } from "@/app/actions/bank-statements";
@@ -7,9 +8,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { formatCurrency } from "@/lib/formatters";
+import { isProUser } from "@/lib/stripe";
 import { BankCharts } from "./_components/bank-charts";
 import { BankTransactionList } from "./_components/bank-transaction-list";
 import { StatementList } from "./_components/statement-list";
+import {
+  BankStatementInsights,
+  BankStatementInsightsSkeleton,
+} from "@/components/bank-statement-insights";
 
 interface PageProps {
   params: { bankAccountId: string };
@@ -47,6 +53,8 @@ export default async function BankAccountPage({ params }: PageProps) {
   } catch {
     notFound();
   }
+
+  const isPro = await isProUser(user.id);
 
   const { account, statements, summary, monthlyTrends } = analysis;
 
@@ -256,6 +264,13 @@ export default async function BankAccountPage({ params }: PageProps) {
           </div>
           <BankTransactionList transactions={transactions} />
         </div>
+
+        <Separator />
+
+        {/* AI Analysis — Pro users get live analysis; free users see locked preview */}
+        <Suspense fallback={<BankStatementInsightsSkeleton />}>
+          <BankStatementInsights transactions={transactions} isPro={isPro} />
+        </Suspense>
       </main>
     </div>
   );

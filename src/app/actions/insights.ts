@@ -47,6 +47,148 @@ export interface SpendingAnomaly {
   insight: string;
 }
 
+// ── analyzeBankStatement types ────────────────────────────────────────────────
+
+export interface BankStatementTopCategory {
+  category: string;
+  amount: number;
+  percentage: number;
+}
+
+export interface BankStatementBiggestExpense {
+  description: string;
+  amount: number;
+  date: string;
+  category: string;
+}
+
+export interface BankStatementRecurringCharge {
+  description: string;
+  amount: number;
+  count: number;
+}
+
+export interface BankStatementAnalysis {
+  topCategories: BankStatementTopCategory[];
+  biggestExpense: BankStatementBiggestExpense | null;
+  recurringCharges: BankStatementRecurringCharge[];
+  summary: string;
+  suggestion: string;
+}
+
+/** Minimal shape the analyzeBankStatement action expects from bank_transactions rows. */
+export interface BankTxInput {
+  date: string;
+  description: string;
+  clean_description: string | null;
+  amount: number;
+  type: "income" | "expense";
+  category: string | null;
+}
+
+// ── analyzeBankStatement ──────────────────────────────────────────────────────
+
+export async function analyzeBankStatement(
+  transactions: BankTxInput[]
+): Promise<BankStatementAnalysis | null> {
+  const expenses = transactions.filter((t) => t.type === "expense");
+  if (expenses.length === 0) return null;
+
+  const totalExpenses = expenses.reduce((s, t) => s + Number(t.amount), 0);
+
+  // ── Pre-compute top 3 categories ───────────────────────────────────────────
+  const catMap: Record<string, number> = {};
+  for (const t of expenses) {
+    const cat = t.category ?? "other";
+    catMap[cat] = (catMap[cat] ?? 0) + Number(t.amount);
+  }
+  const topCategories: BankStatementTopCategory[] = Object.entries(catMap)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([category, amount]) => ({
+      category,
+      amount: Math.round(amount * 100) / 100,
+      percentage: Math.round((amount / totalExpenses) * 100),
+    }));
+
+  // ── Pre-compute biggest single expense ─────────────────────────────────────
+  const biggestTx = expenses.reduce((max, t) =>
+    Number(t.amount) > Number(max.amount) ? t : max
+  );
+  const biggestExpense: BankStatementBiggestExpense = {
+    description: biggestTx.clean_description ?? biggestTx.description,
+    amount:      Math.round(Number(biggestTx.amount) * 100) / 100,
+    date:        biggestTx.date,
+    category:    biggestTx.category ?? "other",
+  };
+
+  // ── Anthropic call — recurring detection + summary + suggestion ────────────
+  const anthropic = new Anthropic();
+
+  // Cap at 200 rows to stay within token budget
+  const minimalTxs = transactions.slice(0, 200).map((t) => ({
+    date:   t.date,
+    desc:   t.clean_description ?? t.description,
+    amount: Number(t.amount),
+    type:   t.type,
+    cat:    t.category ?? "other",
+  }));
+
+  const contextLines = [
+    `Total expenses: $${totalExpenses.toFixed(2)} across ${expenses.length} transactions`,
+    `Top spending: ${topCategories.map((c) => `${c.category} ($${c.amount.toFixed(2)}, ${c.percentage}%)`).join(", ")}`,
+    `Biggest expense: ${biggestExpense.description} on ${biggestExpense.date} for $${biggestExpense.amount.toFixed(2)}`,
+  ].join("\n");
+
+  let recurringCharges: BankStatementRecurringCharge[] = [];
+  let summary = "";
+  let suggestion = "";
+
+  try {
+    const msg = await anthropic.messages.create({
+      model:      "claude-haiku-4-5-20251001",
+      max_tokens: 768,
+      messages: [
+        {
+          role: "user",
+          content:
+            `Analyze this bank statement and return a JSON object with exactly three fields:\n` +
+            `- "recurring": array of recurring charges (same merchant appearing 2+ times with similar amounts), ` +
+            `each with {description: string, amount: number, count: number}. Max 5 items. Empty array if none.\n` +
+            `- "summary": 3-4 sentences describing the user's spending patterns from this statement.\n` +
+            `- "suggestion": one specific, actionable tip to improve their finances based on what you see.\n\n` +
+            `Context:\n${contextLines}\n\n` +
+            `Transactions:\n${JSON.stringify(minimalTxs)}\n\n` +
+            `Return only valid JSON — no markdown, no explanation.`,
+        },
+      ],
+    });
+
+    const raw     = msg.content[0].type === "text" ? msg.content[0].text.trim() : "{}";
+    const cleaned = raw.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
+    const parsed  = JSON.parse(cleaned) as {
+      recurring: { description: string; amount: number; count: number }[];
+      summary:   string;
+      suggestion: string;
+    };
+
+    recurringCharges = Array.isArray(parsed.recurring)
+      ? parsed.recurring.slice(0, 5)
+      : [];
+    summary    = parsed.summary    ?? "";
+    suggestion = parsed.suggestion ?? "";
+  } catch {
+    // Fallback — card still renders without AI text
+    summary    = `You had ${expenses.length} expense transactions totalling $${totalExpenses.toFixed(2)}. ` +
+                 `Your top spending category was ${topCategories[0]?.category ?? "other"}, ` +
+                 `which accounted for ${topCategories[0]?.percentage ?? 0}% of your total spend.`;
+    suggestion = `Review your ${topCategories[0]?.category ?? "top"} spending — it makes up ` +
+                 `${topCategories[0]?.percentage ?? 0}% of your expenses this period.`;
+  }
+
+  return { topCategories, biggestExpense, recurringCharges, summary, suggestion };
+}
+
 // ── naturalLanguageSearch ─────────────────────────────────────────────────────
 
 export async function naturalLanguageSearch(
