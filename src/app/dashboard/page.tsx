@@ -14,6 +14,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { DownloadAppButton } from "./_components/download-app-dialog";
 import { InsightsCard } from "@/components/insights-card";
 import { BudgetPredictionsCard } from "@/components/budget-predictions-card";
+import { HealthScoreCard } from "@/components/health-score-card";
 import { NaturalLanguageSearch } from "@/components/natural-language-search";
 import { getBankAccounts } from "@/app/actions/bank-statements";
 import { getUserPreferences } from "@/app/actions/user-preferences";
@@ -116,6 +117,13 @@ export default async function DashboardPage() {
         {isPro && (
           <Suspense fallback={null}>
             <BudgetPredictionsCard />
+          </Suspense>
+        )}
+
+        {/* AI financial health score — Pro only, streamed in via Suspense */}
+        {isPro && (
+          <Suspense fallback={null}>
+            <HealthScoreCard />
           </Suspense>
         )}
 

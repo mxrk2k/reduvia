@@ -6,6 +6,22 @@ import type { Transaction } from "@/types";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+export interface HealthScoreFactors {
+  budgetAdherence: number;    // 0-100
+  savingsRate: number;        // 0-100
+  incomeConsistency: number;  // 0-100
+  spendingStability: number;  // 0-100
+}
+
+export type HealthScoreLabel = "Needs Work" | "Fair" | "Good" | "Excellent";
+
+export interface FinancialHealthScore {
+  score: number;
+  label: HealthScoreLabel;
+  factors: HealthScoreFactors;
+  explanation: string;
+}
+
 export interface BudgetPrediction {
   category: string;
   budgetAmount: number;
@@ -235,6 +251,210 @@ export async function getSpendingAnomalies(): Promise<SpendingAnomaly[]> {
     ...a,
     insight: insightMap[a.category] ?? fallbackInsight(a.category, a.percentageIncrease),
   }));
+}
+
+// ── getFinancialHealthScore ───────────────────────────────────────────────────
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+function scoreLabel(score: number): HealthScoreLabel {
+  if (score >= 80) return "Excellent";
+  if (score >= 60) return "Good";
+  if (score >= 40) return "Fair";
+  return "Needs Work";
+}
+
+export async function getFinancialHealthScore(): Promise<FinancialHealthScore | null> {
+  const supabase = createClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+  if (authError || !user) return null;
+
+  // ── Date bounds: 3 complete calendar months, excluding current partial month ─
+  const now          = new Date();
+  const currentYear  = now.getFullYear();
+  const currentMonth = now.getMonth(); // 0-indexed
+
+  // Start of 3 months ago, end of last month
+  const windowStart = new Date(currentYear, currentMonth - 3, 1);
+  const windowEnd   = new Date(currentYear, currentMonth, 0); // last day of prev month
+
+  const startDate = windowStart.toISOString().slice(0, 10);
+  const endDate   = windowEnd.toISOString().slice(0, 10);
+
+  // ── Fetch transactions + budgets in parallel ────────────────────────────────
+  const [{ data: txRows }, { data: budgets }] = await Promise.all([
+    supabase
+      .from("transactions")
+      .select("type, amount, category, created_at")
+      .eq("user_id", user.id)
+      .gte("created_at", startDate)
+      .lte("created_at", endDate),
+    supabase
+      .from("budgets")
+      .select("category, monthly_limit")
+      .eq("user_id", user.id),
+  ]);
+
+  const transactions = txRows ?? [];
+
+  // ── Aggregate per month ─────────────────────────────────────────────────────
+  // Build list of the 3 month keys in the window
+  const monthKeys: string[] = [];
+  for (let i = 3; i >= 1; i--) {
+    const d = new Date(currentYear, currentMonth - i, 1);
+    monthKeys.push(monthKey(d.getFullYear(), d.getMonth()));
+  }
+
+  // income & expense totals per month
+  const incomeByMonth:  Record<string, number> = {};
+  const expenseByMonth: Record<string, number> = {};
+  // expense per category per month: { category → { monthKey → total } }
+  const categoryExpenseByMonth: Record<string, Record<string, number>> = {};
+
+  for (const mk of monthKeys) {
+    incomeByMonth[mk]  = 0;
+    expenseByMonth[mk] = 0;
+  }
+
+  for (const tx of transactions) {
+    const mk  = (tx.created_at as string).slice(0, 7);
+    if (!monthKeys.includes(mk)) continue;
+
+    const amt = Number(tx.amount);
+    if (tx.type === "income") {
+      incomeByMonth[mk] = (incomeByMonth[mk] ?? 0) + amt;
+    } else {
+      expenseByMonth[mk] = (expenseByMonth[mk] ?? 0) + amt;
+      const cat = tx.category as string;
+      if (!categoryExpenseByMonth[cat]) categoryExpenseByMonth[cat] = {};
+      categoryExpenseByMonth[cat][mk] = (categoryExpenseByMonth[cat][mk] ?? 0) + amt;
+    }
+  }
+
+  const totalIncome   = Object.values(incomeByMonth).reduce((s, v) => s + v, 0);
+  const totalExpenses = Object.values(expenseByMonth).reduce((s, v) => s + v, 0);
+
+  // ── Factor 1: Budget Adherence ──────────────────────────────────────────────
+  let budgetAdherence: number;
+  if (!budgets?.length) {
+    budgetAdherence = 50; // neutral: no budgets set
+  } else {
+    const scores: number[] = [];
+    for (const budget of budgets) {
+      const cat   = budget.category as string;
+      const limit = Number(budget.monthly_limit);
+      for (const mk of monthKeys) {
+        const spend = categoryExpenseByMonth[cat]?.[mk] ?? 0;
+        if (spend === 0) {
+          scores.push(100); // nothing spent → perfect adherence
+        } else {
+          scores.push(clamp((limit / spend) * 100, 0, 100));
+        }
+      }
+    }
+    budgetAdherence = Math.round(scores.reduce((s, v) => s + v, 0) / scores.length);
+  }
+
+  // ── Factor 2: Savings Rate ──────────────────────────────────────────────────
+  // (income - expenses) / income, mapped: 0% → 0, 20%+ → 100
+  let savingsRate: number;
+  if (totalIncome === 0) {
+    savingsRate = totalExpenses === 0 ? 50 : 0;
+  } else {
+    const rate = (totalIncome - totalExpenses) / totalIncome; // can be negative
+    // Map: rate ≤ 0 → 0, rate ≥ 0.20 → 100
+    savingsRate = Math.round(clamp((rate / 0.20) * 100, 0, 100));
+  }
+
+  // ── Factor 3: Income Consistency (income vs expense ratio per month) ─────────
+  // Per month: ratio = income / expenses; ratio ≥ 1.5 → 100, 0 → 0. Avg across months.
+  const consistencyScores: number[] = [];
+  for (const mk of monthKeys) {
+    const inc = incomeByMonth[mk]  ?? 0;
+    const exp = expenseByMonth[mk] ?? 0;
+    if (exp === 0 && inc === 0) {
+      consistencyScores.push(50); // no activity
+    } else if (exp === 0) {
+      consistencyScores.push(100); // income but no expenses
+    } else {
+      const ratio = inc / exp; // ≥ 1.5 → 100, 0 → 0
+      consistencyScores.push(Math.round(clamp((ratio / 1.5) * 100, 0, 100)));
+    }
+  }
+  const incomeConsistency = Math.round(
+    consistencyScores.reduce((s, v) => s + v, 0) / consistencyScores.length
+  );
+
+  // ── Factor 4: Spending Stability (low CV of monthly expenses) ───────────────
+  let spendingStability: number;
+  const expenseValues = monthKeys.map((mk) => expenseByMonth[mk] ?? 0);
+  const nonZeroMonths = expenseValues.filter((v) => v > 0);
+
+  if (nonZeroMonths.length < 2) {
+    spendingStability = 75; // not enough data to measure variance
+  } else {
+    const mean = expenseValues.reduce((s, v) => s + v, 0) / expenseValues.length;
+    if (mean === 0) {
+      spendingStability = 100;
+    } else {
+      const variance = expenseValues.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / expenseValues.length;
+      const cv = Math.sqrt(variance) / mean; // coefficient of variation
+      // CV = 0 → 100, CV ≥ 1 → 0
+      spendingStability = Math.round(clamp((1 - cv) * 100, 0, 100));
+    }
+  }
+
+  // ── Overall score ───────────────────────────────────────────────────────────
+  const factors: HealthScoreFactors = {
+    budgetAdherence,
+    savingsRate,
+    incomeConsistency,
+    spendingStability,
+  };
+
+  const score = Math.round(
+    (budgetAdherence + savingsRate + incomeConsistency + spendingStability) / 4
+  );
+
+  // ── Anthropic call for explanation ─────────────────────────────────────────
+  const anthropic = new Anthropic();
+
+  const factorLines = [
+    `- Budget Adherence: ${budgetAdherence}/100`,
+    `- Savings Rate: ${savingsRate}/100 (total income $${totalIncome.toFixed(2)}, total expenses $${totalExpenses.toFixed(2)})`,
+    `- Income Consistency: ${incomeConsistency}/100`,
+    `- Spending Stability: ${spendingStability}/100`,
+  ].join("\n");
+
+  let explanation = `Your financial health score is ${score}/100 (${scoreLabel(score)}). Focus on improving your weakest area to boost your overall score.`;
+
+  try {
+    const msg = await anthropic.messages.create({
+      model:      "claude-haiku-4-5-20251001",
+      max_tokens: 256,
+      messages: [
+        {
+          role: "user",
+          content:
+            `A user's financial health score is ${score}/100 (${scoreLabel(score)}), based on these factor scores:\n` +
+            `${factorLines}\n\n` +
+            `Write 2-3 short, friendly sentences explaining this score and identifying the biggest area for improvement. ` +
+            `Be specific and encouraging. Do not use bullet points. Plain text only.`,
+        },
+      ],
+    });
+
+    explanation = msg.content[0].type === "text" ? msg.content[0].text.trim() : explanation;
+  } catch {
+    // Fallback — dashboard still works without AI explanation
+  }
+
+  return { score, label: scoreLabel(score), factors, explanation };
 }
 
 // ── getBudgetPredictions ──────────────────────────────────────────────────────
