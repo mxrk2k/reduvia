@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
+import { createClient } from "@supabase/supabase-js";
 import { getStripeClient } from "@/lib/stripe";
-import { createClient } from "@/lib/supabase/server";
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const body      = await request.text();
@@ -17,7 +17,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
-  const supabase = createClient();
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
 
   // ── checkout.session.completed ────────────────────────────────────────────
 
@@ -26,7 +29,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const customerId = session.customer as string;
     const subId      = session.subscription as string;
 
-    await supabase
+    console.log("[stripe webhook] event:", event.type);
+    console.log("[stripe webhook] client_reference_id:", session.client_reference_id);
+    console.log("[stripe webhook] customer:", session.customer);
+
+    const { error: updateError } = await supabase
       .from("user_preferences")
       .update({
         subscription_tier:      "pro",
@@ -36,6 +43,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         updated_at: new Date().toISOString(),
       })
       .eq("user_id", session.client_reference_id!);
+
+    console.log("[stripe webhook] supabase update error:", updateError ?? null);
   }
 
   // ── customer.subscription.deleted ────────────────────────────────────────
