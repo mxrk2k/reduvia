@@ -2,8 +2,14 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
+import type { Transaction } from "@/types";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
+
+export interface NLSearchResult {
+  transactions: Transaction[];
+  interpretation: string;
+}
 
 export interface SpendingAnomaly {
   category: string;
@@ -11,6 +17,75 @@ export interface SpendingAnomaly {
   averageAmount: number;
   percentageIncrease: number;
   insight: string;
+}
+
+// ── naturalLanguageSearch ─────────────────────────────────────────────────────
+
+export async function naturalLanguageSearch(
+  query: string,
+  transactions: Transaction[]
+): Promise<NLSearchResult> {
+  if (!query.trim() || transactions.length === 0) {
+    return { transactions: [], interpretation: "No transactions to search." };
+  }
+
+  // Build a lookup map so we can resolve IDs → full Transaction objects
+  const txById = new Map(transactions.map((t) => [t.id, t]));
+
+  // Send only the fields Claude needs — keeps the prompt lean
+  const minimalTxs = transactions.map((t) => ({
+    id:          t.id,
+    description: t.description,
+    category:    t.category,
+    type:        t.type,
+    amount:      Number(t.amount),
+    date:        t.created_at.slice(0, 10), // YYYY-MM-DD
+  }));
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  const anthropic = new Anthropic();
+
+  const msg = await anthropic.messages.create({
+    model:      "claude-haiku-4-5-20251001",
+    max_tokens: 1024,
+    system:
+      `Today is ${today}. You are a financial assistant analyzing a user's personal transactions. ` +
+      `When given a natural language query, identify which transactions match it. ` +
+      `Return ONLY a valid JSON object with exactly two fields:\n` +
+      `- "ids": an array of matching transaction id strings (empty array if none match)\n` +
+      `- "interpretation": one short sentence describing what you found ` +
+      `(e.g. "Showing 4 food transactions from last month totalling $123.45.")\n` +
+      `Do not include any other text, explanation, or markdown formatting.`,
+    messages: [
+      {
+        role:    "user",
+        content: `Query: "${query.trim()}"\n\nTransactions:\n${JSON.stringify(minimalTxs)}`,
+      },
+    ],
+  });
+
+  const raw     = msg.content[0].type === "text" ? msg.content[0].text.trim() : "{}";
+  const cleaned = raw.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
+
+  let ids: string[]         = [];
+  let interpretation: string = `Showing results for "${query}".`;
+
+  try {
+    const parsed   = JSON.parse(cleaned) as { ids: string[]; interpretation: string };
+    ids            = Array.isArray(parsed.ids) ? parsed.ids : [];
+    interpretation = parsed.interpretation ?? interpretation;
+  } catch {
+    // Parsing failed — return empty result rather than crashing
+    return { transactions: [], interpretation: `Could not interpret "${query}". Try rephrasing.` };
+  }
+
+  // Guard: only return IDs that actually exist in the user's transaction list
+  const matched = ids
+    .map((id) => txById.get(id))
+    .filter((t): t is Transaction => t !== undefined);
+
+  return { transactions: matched, interpretation };
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

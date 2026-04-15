@@ -13,6 +13,7 @@ import { OnboardingPopup } from "./_components/onboarding-popup";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { DownloadAppButton } from "./_components/download-app-dialog";
 import { InsightsCard } from "@/components/insights-card";
+import { NaturalLanguageSearch } from "@/components/natural-language-search";
 import { getBankAccounts } from "@/app/actions/bank-statements";
 import { getUserPreferences } from "@/app/actions/user-preferences";
 import { isProUser } from "@/lib/stripe";
@@ -117,6 +118,9 @@ export default async function DashboardPage() {
         <SpendingChart transactions={txList} />
 
         <Separator />
+
+        {/* AI natural language search */}
+        <NaturalLanguageSearch isPro={isPro} transactions={txList} />
 
         {/* Transactions section */}
         <TransactionSection transactions={txList} />
