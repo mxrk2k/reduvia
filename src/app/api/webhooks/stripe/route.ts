@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
 import { getStripeClient } from "@/lib/stripe";
+import { captureServerEvent } from "@/lib/posthog";
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const body      = await request.text();
@@ -45,6 +46,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       .eq("user_id", session.client_reference_id!);
 
     console.log("[stripe webhook] supabase update error:", updateError ?? null);
+
+    if (!updateError && session.client_reference_id) {
+      await captureServerEvent(session.client_reference_id, "user_upgraded_to_pro", {
+        customer_id:     customerId,
+        subscription_id: subId,
+      });
+    }
   }
 
   // ── customer.subscription.deleted ────────────────────────────────────────

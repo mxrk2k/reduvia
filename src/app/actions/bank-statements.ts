@@ -18,6 +18,7 @@ import { createClient } from "@/lib/supabase/server";
 import { parsePdfStatement } from "@/lib/parsers";
 import { isProUser } from "@/lib/stripe";
 import { detectAndSuggestRecurring } from "@/app/actions/insights";
+import { captureServerEvent } from "@/lib/posthog";
 import type { ParsedTransaction } from "@/lib/parsers";
 import type { RecurringSuggestion } from "@/app/actions/insights";
 
@@ -358,7 +359,13 @@ export async function importBankStatement(
     if (txError) throw new Error(`Failed to insert transactions: ${txError.message}`);
   }
 
-  // ── 8. Detect recurring patterns from the just-imported transactions ─────────
+  // ── 8. Analytics ──────────────────────────────────────────────────────────────
+  await captureServerEvent(user.id, "bank_statement_imported", {
+    bank_name:         bankName,
+    transaction_count: categorized.length,
+  });
+
+  // ── 9. Detect recurring patterns from the just-imported transactions ─────────
   const recurringSuggestions = await detectAndSuggestRecurring(
     categorized.map((t) => ({
       date:              t.date,

@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import Link from "next/link";
 
+import posthog from "posthog-js";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -82,6 +83,8 @@ export default function LoginPage() {
       setServerError(err instanceof Error ? err.message : "An unexpected error occurred.");
       return;
     }
+
+    posthog.capture("user_logged_in", { method: "email" });
 
     // Hard redirect: ensures middleware sees the fresh session cookie on a
     // new HTTP request rather than relying on the client-side router cache.

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isProUser } from "@/lib/stripe";
+import { captureServerEvent } from "@/lib/posthog";
 import type { TransactionType, TransactionCategory, RecurringFrequency } from "@/types";
 import type { RecurringSuggestion } from "@/app/actions/insights";
 
@@ -74,6 +75,12 @@ export async function addTransaction(data: {
   });
 
   if (error) return { error: error.message };
+
+  await captureServerEvent(user.id, "transaction_added", {
+    type:         data.type,
+    category:     data.category,
+    is_recurring: isRecurring,
+  });
 
   revalidatePath("/dashboard");
   return null;

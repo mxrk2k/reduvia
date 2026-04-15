@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { getStripeClient } from "@/lib/stripe";
 import { createClient } from "@/lib/supabase/server";
+import { captureServerEvent } from "@/lib/posthog";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
@@ -52,6 +53,7 @@ export async function createCheckoutSession(): Promise<never> {
     cancel_url:           `${APP_URL}/pricing`,
   });
 
+  await captureServerEvent(user.id, "user_upgraded_to_pro");
   redirect(session.url!);
 }
 

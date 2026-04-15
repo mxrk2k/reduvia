@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import posthog from "posthog-js";
 import { Button } from "@/components/ui/button";
 import { exportUserData, type UserExport } from "@/app/actions/account";
 
@@ -62,6 +63,7 @@ export function ExportDataButton() {
       setError(result.error);
       return;
     }
+    posthog.capture("user_exported_data", { format: "json" });
     triggerDownload(
       JSON.stringify(result.data, null, 2),
       `reduvia-export-${dateStamp}.json`,
@@ -78,6 +80,7 @@ export function ExportDataButton() {
       setError(result.error);
       return;
     }
+    posthog.capture("user_exported_data", { format: "csv" });
     triggerDownload(
       transactionsToCsv(result.data.transactions),
       `reduvia-transactions-${dateStamp}.csv`,

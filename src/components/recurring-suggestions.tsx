@@ -8,9 +8,6 @@ import type { RecurringSuggestion } from "@/app/actions/insights";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function capitalize(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
 
 function frequencyLabel(f: RecurringSuggestion["frequency"]): string {
   return { weekly: "Weekly", monthly: "Monthly", yearly: "Yearly" }[f];

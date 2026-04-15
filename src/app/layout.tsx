@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import { Analytics } from "@vercel/analytics/next";
 import { ThemeProvider } from "@/components/theme-provider";
 import { CookieBanner } from "@/components/cookie-banner";
+import { PostHogProvider } from "@/components/posthog-provider";
 import "./globals.css";
 
 const geistSans = localFont({
@@ -49,9 +50,11 @@ export default function RootLayout({
         />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <ThemeProvider>{children}</ThemeProvider>
-        <CookieBanner />
-        <Analytics />
+        <PostHogProvider>
+          <ThemeProvider>{children}</ThemeProvider>
+          <CookieBanner />
+          <Analytics />
+        </PostHogProvider>
       </body>
     </html>
   );

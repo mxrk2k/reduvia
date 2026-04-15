@@ -2,6 +2,7 @@
 
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { captureServerEvent } from "@/lib/posthog";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -61,6 +62,8 @@ export async function exportUserData(): Promise<
       return { error: `Failed to export ${label}.` };
     }
   }
+
+  await captureServerEvent(userId, "data_exported");
 
   return {
     data: {
