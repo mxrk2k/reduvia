@@ -1,36 +1,58 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Reduvia
 
-## Getting Started
+A personal finance tracker I built as part of my graduate software engineering coursework. The idea came from wanting something that actually helps you understand where your money goes — not just log transactions.
 
-First, run the development server:
+## What it does
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- Add income and expenses manually, with categories and descriptions
+- See your balance, spending breakdown, and monthly trends on a dashboard
+- Set monthly budgets per category — the app warns you when you're spending faster than you should be
+- Import a bank statement PDF (Chase, AMEX, or most major banks) and get AI-powered analysis of your spending
+- Recurring transactions with due-soon reminders
+- Search and filter your transaction history
+- Export to CSV
+- Mobile app (iOS and Android) built with React Native and Expo
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Live demo
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+https://reduvia.vercel.app
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Tech stack
 
-## Learn More
+- Next.js 14 (App Router) + TypeScript
+- Supabase (PostgreSQL + Auth)
+- TailwindCSS + shadcn/ui
+- Recharts for data visualization
+- Three.js for the login page background
+- Anthropic API (Claude) for bank statement parsing
+- React Native + Expo for the mobile app
+- Deployed on Vercel
 
-To learn more about Next.js, take a look at the following resources:
+## Running locally
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+You'll need Node.js 18+ and a Supabase project.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. Clone the repo
+2. Install dependencies: `npm install`
+3. Copy `.env.local.example` to `.env.local` and fill in your Supabase and Anthropic keys
+4. Run the dev server: `npm run dev`
+5. Open http://localhost:3000
 
-## Deploy on Vercel
+For the mobile app:
+  cd mobile
+  npx expo start
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Environment variables
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+ANTHROPIC_API_KEY=
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Database
+
+Run the migrations in `supabase/migrations/` in order (001 through 007) against your Supabase project using the SQL editor.
+
+## Notes
+
+This started as a simple transaction tracker and grew from there. The bank statement import feature ended up being the most interesting part to build — getting Claude to reliably parse PDFs from different banks took a few iterations, final pdf-parsing with Claude AI works well now.
+
+Built by Mark D'Souza — MS Computer Science student at Cleveland State University.
