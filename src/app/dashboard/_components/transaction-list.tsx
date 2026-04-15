@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Trash2, Repeat2 } from "lucide-react";
 
 import { deleteTransaction } from "@/app/actions/transactions";
+import { AddTransactionDialog } from "./add-transaction-dialog";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -80,6 +81,9 @@ export function TransactionList({ transactions }: TransactionListProps) {
             {t.type === "income" ? "+" : "-"}
             {formatCurrency(Number(t.amount))}
           </span>
+
+          {/* Edit */}
+          <AddTransactionDialog transaction={t} />
 
           {/* Delete */}
           <Button

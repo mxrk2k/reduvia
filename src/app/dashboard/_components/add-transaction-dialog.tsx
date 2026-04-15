@@ -5,9 +5,9 @@ import { useRouter } from "next/navigation";
 import { useForm, type Resolver, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus } from "lucide-react";
+import { Plus, Pencil } from "lucide-react";
 
-import { addTransaction } from "@/app/actions/transactions";
+import { addTransaction, updateTransaction } from "@/app/actions/transactions";
 import { INCOME_CATEGORIES, EXPENSE_CATEGORIES } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,7 +33,9 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import type { TransactionCategory, RecurringFrequency } from "@/types";
+import type { Transaction, TransactionCategory, RecurringFrequency } from "@/types";
+
+// ── Schema ────────────────────────────────────────────────────────────────────
 
 const schema = z
   .object({
@@ -41,6 +43,7 @@ const schema = z
     amount:              z.coerce.number().positive("Amount must be greater than 0"),
     category:            z.string().min(1, "Please select a category"),
     description:         z.string().min(1, "Description is required").max(100),
+    date:                z.string().min(1, "Date is required"),
     is_recurring:        z.boolean(),
     recurring_frequency: z.enum(["weekly", "monthly", "yearly"]).optional(),
   })
@@ -51,44 +54,93 @@ const schema = z
 
 type FormValues = z.infer<typeof schema>;
 
-export function AddTransactionDialog({ triggerClassName }: { triggerClassName?: string }) {
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function toDateInputValue(isoString: string): string {
+  // created_at may be a full ISO timestamp or a YYYY-MM-DD string
+  return isoString.slice(0, 10);
+}
+
+function todayInputValue(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
+interface AddTransactionDialogProps {
+  triggerClassName?: string;
+  /** When provided the dialog operates in edit mode */
+  transaction?: Transaction;
+}
+
+export function AddTransactionDialog({
+  triggerClassName,
+  transaction,
+}: AddTransactionDialogProps) {
+  const isEdit = !!transaction;
   const [open, setOpen] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const router = useRouter();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as Resolver<FormValues>,
-    defaultValues: {
-      type:                "expense",
-      amount:              0,
-      category:            "",
-      description:         "",
-      is_recurring:        false,
-      recurring_frequency: undefined,
-    },
+    defaultValues: isEdit
+      ? {
+          type:                transaction.type,
+          amount:              transaction.amount,
+          category:            transaction.category,
+          description:         transaction.description,
+          date:                toDateInputValue(transaction.created_at),
+          is_recurring:        transaction.is_recurring,
+          recurring_frequency: transaction.recurring_frequency ?? undefined,
+        }
+      : {
+          type:                "expense",
+          amount:              0,
+          category:            "",
+          description:         "",
+          date:                todayInputValue(),
+          is_recurring:        false,
+          recurring_frequency: undefined,
+        },
   });
 
-  const selectedType  = form.watch("type");
-  const isRecurring   = form.watch("is_recurring");
-  const categories    = selectedType === "income" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+  const selectedType = form.watch("type");
+  const isRecurring  = form.watch("is_recurring");
+  const categories   = selectedType === "income" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
 
   async function onSubmit(values: FormValues) {
     setServerError(null);
-    const result = await addTransaction({
-      type:                values.type,
-      amount:              values.amount,
-      category:            values.category as TransactionCategory,
-      description:         values.description,
-      is_recurring:        values.is_recurring,
-      recurring_frequency: values.is_recurring
-        ? (values.recurring_frequency as RecurringFrequency)
-        : undefined,
-    });
+
+    const result = isEdit
+      ? await updateTransaction(transaction.id, {
+          type:                values.type,
+          amount:              values.amount,
+          category:            values.category as TransactionCategory,
+          description:         values.description,
+          date:                values.date,
+          is_recurring:        values.is_recurring,
+          recurring_frequency: values.is_recurring
+            ? (values.recurring_frequency as RecurringFrequency)
+            : undefined,
+        })
+      : await addTransaction({
+          type:                values.type,
+          amount:              values.amount,
+          category:            values.category as TransactionCategory,
+          description:         values.description,
+          is_recurring:        values.is_recurring,
+          recurring_frequency: values.is_recurring
+            ? (values.recurring_frequency as RecurringFrequency)
+            : undefined,
+        });
+
     if (result?.error) {
       setServerError(result.error);
       return;
     }
-    form.reset();
+
+    if (!isEdit) form.reset();
     setOpen(false);
     router.refresh();
   }
@@ -98,17 +150,36 @@ export function AddTransactionDialog({ triggerClassName }: { triggerClassName?: 
       open={open}
       onOpenChange={(o) => {
         setOpen(o);
-        if (!o) setServerError(null);
+        if (!o) {
+          setServerError(null);
+          // Reset edit form back to original values when closed without saving
+          if (isEdit) form.reset();
+        }
       }}
     >
-      <DialogTrigger render={<Button size="sm" className={triggerClassName} />}>
-        <Plus className="mr-2 h-4 w-4" />
-        Add Transaction
-      </DialogTrigger>
+      {isEdit ? (
+        <DialogTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-11 w-11 shrink-0 text-muted-foreground hover:text-foreground sm:h-8 sm:w-8"
+            />
+          }
+        >
+          <Pencil className="h-4 w-4" />
+          <span className="sr-only">Edit transaction</span>
+        </DialogTrigger>
+      ) : (
+        <DialogTrigger render={<Button size="sm" className={triggerClassName} />}>
+          <Plus className="mr-2 h-4 w-4" />
+          Add Transaction
+        </DialogTrigger>
+      )}
 
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Add Transaction</DialogTitle>
+          <DialogTitle>{isEdit ? "Edit Transaction" : "Add Transaction"}</DialogTitle>
         </DialogHeader>
 
         <Form {...form}>
@@ -206,6 +277,21 @@ export function AddTransactionDialog({ triggerClassName }: { triggerClassName?: 
               )}
             />
 
+            {/* Date */}
+            <FormField
+              control={form.control}
+              name="date"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Date</FormLabel>
+                  <FormControl>
+                    <Input type="date" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             {/* Recurring toggle */}
             <FormField
               control={form.control}
@@ -276,7 +362,11 @@ export function AddTransactionDialog({ triggerClassName }: { triggerClassName?: 
                 Cancel
               </Button>
               <Button type="submit" disabled={form.formState.isSubmitting}>
-                {form.formState.isSubmitting ? "Saving..." : "Save"}
+                {form.formState.isSubmitting
+                  ? "Saving..."
+                  : isEdit
+                  ? "Save Changes"
+                  : "Save"}
               </Button>
             </div>
           </form>

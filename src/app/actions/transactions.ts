@@ -78,6 +78,53 @@ export async function addTransaction(data: {
   return null;
 }
 
+export async function updateTransaction(
+  id: string,
+  data: {
+    type: TransactionType;
+    amount: number;
+    category: TransactionCategory;
+    description: string;
+    date: string; // YYYY-MM-DD
+    is_recurring: boolean;
+    recurring_frequency?: RecurringFrequency;
+  }
+): Promise<ActionResult> {
+  const supabase = createClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) return { error: "Not authenticated" };
+
+  if (data.is_recurring && !(await isProUser(user.id))) {
+    return { error: "Recurring transactions are a Pro feature. Upgrade to Pro at /pricing" };
+  }
+
+  const { error } = await supabase
+    .from("transactions")
+    .update({
+      type:                data.type,
+      amount:              data.amount,
+      category:            data.category,
+      description:         data.description,
+      created_at:          data.date,
+      is_recurring:        data.is_recurring,
+      recurring_frequency: data.is_recurring ? (data.recurring_frequency ?? null) : null,
+      next_due_date:       data.is_recurring && data.recurring_frequency
+                             ? calculateNextDueDate(data.recurring_frequency)
+                             : null,
+    })
+    .eq("id", id)
+    .eq("user_id", user.id);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/dashboard");
+  return null;
+}
+
 export async function deleteTransaction(id: string): Promise<ActionResult> {
   const supabase = createClient();
   const {
