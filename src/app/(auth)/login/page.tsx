@@ -17,6 +17,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { GoogleButton, OrDivider } from "../_components/google-button";
 
 // ── Validation (unchanged) ────────────────────────────────────────────────────
 
@@ -93,6 +94,12 @@ export default function LoginPage() {
       <div className="mb-7">
         <h2 className="text-xl font-semibold text-white">Welcome back</h2>
         <p className="mt-1 text-sm text-white/45">Sign in to your account</p>
+      </div>
+
+      {/* Google OAuth */}
+      <div className="mb-5 space-y-4">
+        <GoogleButton />
+        <OrDivider />
       </div>
 
       {/* Form — all fields and validation logic unchanged */}
