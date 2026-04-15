@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { Separator } from "@/components/ui/separator";
 import { SummaryCards } from "./_components/summary-cards";
@@ -11,8 +12,10 @@ import { HamburgerMenu } from "./_components/hamburger-menu";
 import { OnboardingPopup } from "./_components/onboarding-popup";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { DownloadAppButton } from "./_components/download-app-dialog";
+import { InsightsCard } from "@/components/insights-card";
 import { getBankAccounts } from "@/app/actions/bank-statements";
 import { getUserPreferences } from "@/app/actions/user-preferences";
+import { isProUser } from "@/lib/stripe";
 import type { Transaction } from "@/types";
 
 export default async function DashboardPage() {
@@ -52,10 +55,11 @@ export default async function DashboardPage() {
     .lte("next_due_date", fmt(sevenDaysLater))
     .order("next_due_date", { ascending: true });
 
-  // Bank accounts (for hamburger menu + onboarding check)
-  const [bankAccounts, preferences] = await Promise.all([
+  // Bank accounts (for hamburger menu + onboarding check) + Pro status
+  const [bankAccounts, preferences, isPro] = await Promise.all([
     getBankAccounts(),
     getUserPreferences(),
+    isProUser(user.id),
   ]);
 
   const txList  = (transactions  ?? []) as Transaction[];
@@ -98,6 +102,13 @@ export default async function DashboardPage() {
 
         {/* Due soon — only rendered when there is data */}
         <DueSoon transactions={dueSoon} />
+
+        {/* AI spending insights — Pro only, streamed in via Suspense */}
+        {isPro && (
+          <Suspense fallback={null}>
+            <InsightsCard />
+          </Suspense>
+        )}
 
         {/* Summary cards */}
         <SummaryCards transactions={txList} />
