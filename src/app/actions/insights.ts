@@ -6,6 +6,18 @@ import type { Transaction } from "@/types";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+export interface BudgetPrediction {
+  category: string;
+  budgetAmount: number;
+  currentSpend: number;
+  projectedAmount: number;
+  /** Human-readable date string, e.g. "April 23" */
+  predictedExceedDate: string;
+  /** true when currentSpend already exceeds budgetAmount */
+  alreadyExceeded: boolean;
+  prediction: string;
+}
+
 export interface NLSearchResult {
   transactions: Transaction[];
   interpretation: string;
@@ -222,5 +234,156 @@ export async function getSpendingAnomalies(): Promise<SpendingAnomaly[]> {
   return flagged.map((a) => ({
     ...a,
     insight: insightMap[a.category] ?? fallbackInsight(a.category, a.percentageIncrease),
+  }));
+}
+
+// ── getBudgetPredictions ──────────────────────────────────────────────────────
+
+function fallbackPrediction(
+  category: string,
+  exceedDate: string,
+  alreadyExceeded: boolean
+): string {
+  if (alreadyExceeded) {
+    return `You've already exceeded your ${category} budget this month.`;
+  }
+  return `At your current pace you will exceed your ${category} budget by ${exceedDate}.`;
+}
+
+function formatExceedDate(date: Date): string {
+  return date.toLocaleDateString("en-US", { month: "long", day: "numeric" });
+}
+
+export async function getBudgetPredictions(): Promise<BudgetPrediction[]> {
+  const supabase = createClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+  if (authError || !user) return [];
+
+  // ── Date helpers ────────────────────────────────────────────────────────────
+  const now          = new Date();
+  const year         = now.getFullYear();
+  const month        = now.getMonth(); // 0-indexed
+  const dayOfMonth   = now.getDate();  // 1-indexed, current day
+  const daysInMonth  = new Date(year, month + 1, 0).getDate();
+  const daysElapsed  = dayOfMonth;
+  const daysRemaining = daysInMonth - dayOfMonth;
+
+  // Can't project a rate on the very first day (no elapsed time)
+  if (daysElapsed === 0) return [];
+
+  const monthStart = `${year}-${String(month + 1).padStart(2, "0")}-01`;
+
+  // ── Fetch budgets + current-month expense transactions in parallel ───────────
+  const [{ data: budgets }, { data: txRows }] = await Promise.all([
+    supabase.from("budgets").select("category, monthly_limit").eq("user_id", user.id),
+    supabase
+      .from("transactions")
+      .select("category, amount")
+      .eq("user_id", user.id)
+      .eq("type", "expense")
+      .gte("created_at", monthStart),
+  ]);
+
+  if (!budgets?.length) return [];
+
+  // ── Aggregate current spend per category ────────────────────────────────────
+  const spendByCategory: Record<string, number> = {};
+  for (const tx of txRows ?? []) {
+    const cat = tx.category as string;
+    spendByCategory[cat] = (spendByCategory[cat] ?? 0) + Number(tx.amount);
+  }
+
+  // ── Project and flag ────────────────────────────────────────────────────────
+  const flagged: Omit<BudgetPrediction, "prediction">[] = [];
+
+  for (const budget of budgets) {
+    const category    = budget.category as string;
+    const budgetAmount = Number(budget.monthly_limit);
+    const currentSpend = spendByCategory[category] ?? 0;
+
+    // No spending yet — nothing to project
+    if (currentSpend === 0) continue;
+
+    const dailyRate      = currentSpend / daysElapsed;
+    const projectedAmount = currentSpend + dailyRate * daysRemaining;
+
+    // Only flag if projected total will exceed the budget
+    if (projectedAmount <= budgetAmount && currentSpend < budgetAmount) continue;
+
+    const alreadyExceeded = currentSpend >= budgetAmount;
+
+    let exceedDate: Date;
+    if (alreadyExceeded) {
+      exceedDate = now;
+    } else {
+      // Days from today until the running total crosses the budget limit
+      const daysUntilCrossing = (budgetAmount - currentSpend) / dailyRate;
+      exceedDate = new Date(year, month, dayOfMonth + Math.ceil(daysUntilCrossing));
+    }
+
+    flagged.push({
+      category,
+      budgetAmount,
+      currentSpend,
+      projectedAmount: Math.round(projectedAmount * 100) / 100,
+      predictedExceedDate: formatExceedDate(exceedDate),
+      alreadyExceeded,
+    });
+  }
+
+  if (flagged.length === 0) return [];
+
+  // ── Single Anthropic call for all warning sentences ─────────────────────────
+  const anthropic = new Anthropic();
+
+  const lines = flagged
+    .map((p) =>
+      p.alreadyExceeded
+        ? `- ${p.category}: $${p.currentSpend.toFixed(2)} spent of $${p.budgetAmount.toFixed(2)} budget (already exceeded by $${(p.currentSpend - p.budgetAmount).toFixed(2)})`
+        : `- ${p.category}: $${p.currentSpend.toFixed(2)} spent of $${p.budgetAmount.toFixed(2)} budget, projected $${p.projectedAmount.toFixed(2)} by month end (will exceed on ${p.predictedExceedDate})`
+    )
+    .join("\n");
+
+  let predictionMap: Record<string, string> = {};
+
+  try {
+    const msg = await anthropic.messages.create({
+      model:      "claude-haiku-4-5-20251001",
+      max_tokens: 512,
+      messages: [
+        {
+          role: "user",
+          content:
+            `Generate one short, friendly but urgent budget warning sentence per category below. ` +
+            `For categories already exceeded say so clearly. For others, mention the projected exceed date. ` +
+            `Keep each sentence under 20 words. Be specific about amounts or dates.\n\n` +
+            `${lines}\n\n` +
+            `Return only a JSON array: [{"category":"food","prediction":"..."},...]`,
+        },
+      ],
+    });
+
+    const raw     = msg.content[0].type === "text" ? msg.content[0].text.trim() : "[]";
+    const cleaned = raw.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
+    const parsed  = JSON.parse(cleaned) as { category: string; prediction: string }[];
+    predictionMap = Object.fromEntries(parsed.map((p) => [p.category, p.prediction]));
+  } catch {
+    for (const p of flagged) {
+      predictionMap[p.category] = fallbackPrediction(
+        p.category,
+        p.predictedExceedDate,
+        p.alreadyExceeded
+      );
+    }
+  }
+
+  return flagged.map((p) => ({
+    ...p,
+    prediction:
+      predictionMap[p.category] ??
+      fallbackPrediction(p.category, p.predictedExceedDate, p.alreadyExceeded),
   }));
 }

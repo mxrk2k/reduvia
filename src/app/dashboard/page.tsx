@@ -13,6 +13,7 @@ import { OnboardingPopup } from "./_components/onboarding-popup";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { DownloadAppButton } from "./_components/download-app-dialog";
 import { InsightsCard } from "@/components/insights-card";
+import { BudgetPredictionsCard } from "@/components/budget-predictions-card";
 import { NaturalLanguageSearch } from "@/components/natural-language-search";
 import { getBankAccounts } from "@/app/actions/bank-statements";
 import { getUserPreferences } from "@/app/actions/user-preferences";
@@ -108,6 +109,13 @@ export default async function DashboardPage() {
         {isPro && (
           <Suspense fallback={null}>
             <InsightsCard />
+          </Suspense>
+        )}
+
+        {/* AI budget predictions — Pro only, streamed in via Suspense */}
+        {isPro && (
+          <Suspense fallback={null}>
+            <BudgetPredictionsCard />
           </Suspense>
         )}
 
