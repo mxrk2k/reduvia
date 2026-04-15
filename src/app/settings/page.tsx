@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { CreditCard } from "lucide-react";
 import { DeleteAccountButton } from "@/components/delete-account-button";
 import { ExportDataButton } from "@/components/export-data-button";
 
@@ -5,6 +7,31 @@ export default function SettingsPage() {
   return (
     <main className="mx-auto max-w-2xl p-6">
       <h1 className="text-2xl font-semibold">Settings</h1>
+
+      {/* Billing */}
+      <section className="mt-10">
+        <h2 className="mb-1 text-base font-semibold">Billing</h2>
+        <p className="mb-4 text-sm text-muted-foreground">
+          View your current plan and manage your subscription.
+        </p>
+        <div className="rounded-lg border p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-medium">Subscription &amp; Payments</p>
+              <p className="text-xs text-muted-foreground">
+                Upgrade to Pro or manage your billing details.
+              </p>
+            </div>
+            <Link
+              href="/billing"
+              className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted"
+            >
+              <CreditCard className="h-4 w-4" />
+              Manage Billing
+            </Link>
+          </div>
+        </div>
+      </section>
 
       {/* Your Data */}
       <section className="mt-10">
