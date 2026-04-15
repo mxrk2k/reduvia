@@ -19,6 +19,7 @@ import { NaturalLanguageSearch } from "@/components/natural-language-search";
 import { getBankAccounts } from "@/app/actions/bank-statements";
 import { getUserPreferences } from "@/app/actions/user-preferences";
 import { isProUser } from "@/lib/stripe";
+import { DEFAULT_CURRENCY } from "@/lib/currencies";
 import type { Transaction } from "@/types";
 
 export default async function DashboardPage() {
@@ -68,6 +69,8 @@ export default async function DashboardPage() {
   const txList  = (transactions  ?? []) as Transaction[];
   const dueSoon = (dueSoonRaw    ?? []) as Transaction[];
 
+  const currency = preferences?.preferred_currency ?? DEFAULT_CURRENCY;
+
   // Show onboarding popup if user has no bank accounts and hasn't dismissed it
   const showOnboarding =
     bankAccounts.length === 0 && preferences?.dismiss_import_prompt !== true;
@@ -104,19 +107,19 @@ export default async function DashboardPage() {
         </div>
 
         {/* Due soon — only rendered when there is data */}
-        <DueSoon transactions={dueSoon} />
+        <DueSoon transactions={dueSoon} currency={currency} />
 
         {/* AI spending insights — Pro only, streamed in via Suspense */}
         {isPro && (
           <Suspense fallback={null}>
-            <InsightsCard />
+            <InsightsCard currency={currency} />
           </Suspense>
         )}
 
         {/* AI budget predictions — Pro only, streamed in via Suspense */}
         {isPro && (
           <Suspense fallback={null}>
-            <BudgetPredictionsCard />
+            <BudgetPredictionsCard currency={currency} />
           </Suspense>
         )}
 
@@ -128,10 +131,10 @@ export default async function DashboardPage() {
         )}
 
         {/* Summary cards */}
-        <SummaryCards transactions={txList} />
+        <SummaryCards transactions={txList} currency={currency} />
 
         {/* Spending breakdown */}
-        <SpendingChart transactions={txList} />
+        <SpendingChart transactions={txList} currency={currency} />
 
         <Separator />
 
@@ -139,7 +142,7 @@ export default async function DashboardPage() {
         <NaturalLanguageSearch isPro={isPro} transactions={txList} />
 
         {/* Transactions section */}
-        <TransactionSection transactions={txList} />
+        <TransactionSection transactions={txList} currency={currency} />
       </main>
 
       {/* Onboarding popup — client component, only mounts when needed */}

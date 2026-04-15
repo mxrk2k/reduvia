@@ -114,7 +114,13 @@ function ProgressBar({
   );
 }
 
-export function BudgetList({ budgets }: { budgets: BudgetWithSpending[] }) {
+export function BudgetList({
+  budgets,
+  currency,
+}: {
+  budgets: BudgetWithSpending[];
+  currency: string;
+}) {
   if (budgets.length === 0) {
     return (
       <Card>
@@ -141,8 +147,8 @@ export function BudgetList({ budgets }: { budgets: BudgetWithSpending[] }) {
                 <div>
                   <p className="font-medium capitalize">{budget.category}</p>
                   <p className="text-xs text-muted-foreground">
-                    {formatCurrency(budget.spent)} of{" "}
-                    {formatCurrency(budget.monthly_limit)} spent
+                    {formatCurrency(budget.spent, currency)} of{" "}
+                    {formatCurrency(budget.monthly_limit, currency)} spent
                     <span className={`ml-2 font-medium ${pace.statusColor}`}>
                       · {pace.statusLabel}
                     </span>

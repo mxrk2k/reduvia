@@ -4,9 +4,10 @@ import type { Transaction } from "@/types";
 
 interface SummaryCardsProps {
   transactions: Transaction[];
+  currency: string;
 }
 
-export function SummaryCards({ transactions }: SummaryCardsProps) {
+export function SummaryCards({ transactions, currency }: SummaryCardsProps) {
   const totalIncome = transactions
     .filter((t) => t.type === "income")
     .reduce((sum, t) => sum + Number(t.amount), 0);
@@ -27,7 +28,7 @@ export function SummaryCards({ transactions }: SummaryCardsProps) {
         </CardHeader>
         <CardContent>
           <p className="text-2xl font-bold text-emerald-600">
-            {formatCurrency(totalIncome)}
+            {formatCurrency(totalIncome, currency)}
           </p>
         </CardContent>
       </Card>
@@ -40,7 +41,7 @@ export function SummaryCards({ transactions }: SummaryCardsProps) {
         </CardHeader>
         <CardContent>
           <p className="text-2xl font-bold text-rose-600">
-            {formatCurrency(totalExpenses)}
+            {formatCurrency(totalExpenses, currency)}
           </p>
         </CardContent>
       </Card>
@@ -57,7 +58,7 @@ export function SummaryCards({ transactions }: SummaryCardsProps) {
               balance >= 0 ? "text-emerald-600" : "text-rose-600"
             }`}
           >
-            {formatCurrency(balance)}
+            {formatCurrency(balance, currency)}
           </p>
         </CardContent>
       </Card>

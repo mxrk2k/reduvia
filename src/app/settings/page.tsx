@@ -1,12 +1,52 @@
 import Link from "next/link";
 import { CreditCard } from "lucide-react";
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
 import { DeleteAccountButton } from "@/components/delete-account-button";
 import { ExportDataButton } from "@/components/export-data-button";
+import { CurrencySelector } from "@/components/currency-selector";
+import { DEFAULT_CURRENCY } from "@/lib/currencies";
 
-export default function SettingsPage() {
+export default async function SettingsPage() {
+  const supabase = createClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+  if (authError || !user) redirect("/login");
+
+  const { data: prefs } = await supabase
+    .from("user_preferences")
+    .select("preferred_currency")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  const preferredCurrency =
+    (prefs?.preferred_currency as string | undefined) ?? DEFAULT_CURRENCY;
+
   return (
     <main className="mx-auto max-w-2xl p-6">
       <h1 className="text-2xl font-semibold">Settings</h1>
+
+      {/* Currency */}
+      <section className="mt-10">
+        <h2 className="mb-1 text-base font-semibold">Currency</h2>
+        <p className="mb-4 text-sm text-muted-foreground">
+          Choose the currency used to display all amounts across the app.
+        </p>
+        <div className="rounded-lg border p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-medium">Display Currency</p>
+              <p className="text-xs text-muted-foreground">
+                Amounts are displayed in this currency symbol. Exchange rates
+                are not applied.
+              </p>
+            </div>
+            <CurrencySelector currentCurrency={preferredCurrency} />
+          </div>
+        </div>
+      </section>
 
       {/* Billing */}
       <section className="mt-10">

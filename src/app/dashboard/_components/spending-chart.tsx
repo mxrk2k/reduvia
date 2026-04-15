@@ -9,10 +9,12 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { formatCurrency } from "@/lib/formatters";
+import { getCurrencySymbol } from "@/lib/currencies";
 import type { Transaction } from "@/types";
 
 interface SpendingChartProps {
   transactions: Transaction[];
+  currency: string;
 }
 
 // ── Colours ──────────────────────────────────────────────────────────────────
@@ -82,125 +84,16 @@ function buildMonthlyTrends(transactions: Transaction[]): MonthlyEntry[] {
   });
 }
 
-// ── Tooltips ──────────────────────────────────────────────────────────────────
-
-function CustomTooltip({
-  active,
-  payload,
-}: {
-  active?: boolean;
-  payload?: { name: string; value: number }[];
-}) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="rounded-lg border bg-background px-3 py-2 text-sm shadow-md">
-      <p className="font-medium">{payload[0].name}</p>
-      <p className="text-muted-foreground">{formatCurrency(payload[0].value)}</p>
-    </div>
-  );
-}
-
-function BarTooltip({
-  active,
-  payload,
-}: {
-  active?: boolean;
-  payload?: { name: string; value: number; fill: string }[];
-}) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="rounded-lg border bg-background px-3 py-2 text-sm shadow-md space-y-1">
-      {payload.map((p) => (
-        <div key={p.name} className="flex items-center gap-2">
-          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: p.fill }} />
-          <span className="text-muted-foreground">{p.name}</span>
-          <span className="font-medium tabular-nums">{formatCurrency(p.value)}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function TrendTooltip({
-  active,
-  payload,
-  label,
-  isDark,
-}: {
-  active?: boolean;
-  // Recharts TooltipPayload is ReadonlyArray<TooltipPayloadEntry>; use readonly any[]
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  payload?: readonly any[];
-  label?: string;
-  isDark: boolean;
-}) {
-  if (!active || !payload?.length) return null;
-
-  const income   = payload.find((p) => p.name === "income");
-  const expenses = payload.find((p) => p.name === "expenses");
-
-  return (
-    <div
-      style={{
-        background:   isDark ? "#1e293b" : "#ffffff",
-        border:       `1px solid ${isDark ? "#334155" : "#e2e8f0"}`,
-        borderRadius: 8,
-        padding:      "10px 14px",
-        color:        isDark ? "#f1f5f9" : "#0f172a",
-        fontSize:     13,
-        minWidth:     140,
-        boxShadow:    "0 4px 12px rgba(0,0,0,0.15)",
-      }}
-    >
-      <p style={{ fontWeight: 600, marginBottom: 6 }}>{label}</p>
-      {income && (
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 3 }}>
-          <span style={{ color: isDark ? "#6ee7b7" : "#059669" }}>Income</span>
-          <span style={{ fontWeight: 600, fontVariantNumeric: "tabular-nums", color: isDark ? "#10b981" : "#059669" }}>
-            {formatCurrency(income.value)}
-          </span>
-        </div>
-      )}
-      {expenses && (
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-          <span style={{ color: isDark ? "#fda4af" : "#e11d48" }}>Expenses</span>
-          <span style={{ fontWeight: 600, fontVariantNumeric: "tabular-nums", color: isDark ? "#f43f5e" : "#e11d48" }}>
-            {formatCurrency(expenses.value)}
-          </span>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Custom active dot (glow ring) ─────────────────────────────────────────────
-
-function ActiveDot({
-  cx,
-  cy,
-  fill,
-}: {
-  cx?: number;
-  cy?: number;
-  fill?: string;
-}) {
-  if (cx === undefined || cy === undefined) return null;
-  return (
-    <g>
-      <circle cx={cx} cy={cy} r={9} fill={fill} opacity={0.2} />
-      <circle cx={cx} cy={cy} r={5} fill={fill} stroke="white" strokeWidth={1.5} />
-    </g>
-  );
-}
-
 // ── Monthly trends chart ──────────────────────────────────────────────────────
 
 function MonthlyTrendsChart({
   trendData,
   isDark,
+  currency,
 }: {
   trendData: MonthlyEntry[];
   isDark: boolean;
+  currency: string;
 }) {
   const monthsWithData = trendData.filter(
     (m) => m.income > 0 || m.expenses > 0
@@ -211,6 +104,7 @@ function MonthlyTrendsChart({
   const gridOpacity   = isDark ? 0.10 : 0.08;
   const axisTextColor = isDark ? "#9ca3af" : "#6b7280";
   const fillOpacity   = isDark ? 0.20 : 0.15;
+  const symbol        = getCurrencySymbol(currency);
 
   if (monthsWithData < 2) {
     return (
@@ -257,21 +151,50 @@ function MonthlyTrendsChart({
             tickLine={false}
           />
           <YAxis
-            tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
+            tickFormatter={(v) => `${symbol}${(v / 1000).toFixed(0)}k`}
             tick={{ fill: axisTextColor, fontSize: 11 }}
             axisLine={false}
             tickLine={false}
             width={36}
           />
           <Tooltip
-            content={({ active, payload, label }) => (
-              <TrendTooltip
-                active={active}
-                payload={payload}
-                label={label !== undefined ? String(label) : undefined}
-                isDark={isDark}
-              />
-            )}
+            content={({ active, payload, label }) => {
+              if (!active || !payload?.length) return null;
+              const income   = payload.find((p) => p.name === "income");
+              const expenses = payload.find((p) => p.name === "expenses");
+              return (
+                <div
+                  style={{
+                    background:   isDark ? "#1e293b" : "#ffffff",
+                    border:       `1px solid ${isDark ? "#334155" : "#e2e8f0"}`,
+                    borderRadius: 8,
+                    padding:      "10px 14px",
+                    color:        isDark ? "#f1f5f9" : "#0f172a",
+                    fontSize:     13,
+                    minWidth:     140,
+                    boxShadow:    "0 4px 12px rgba(0,0,0,0.15)",
+                  }}
+                >
+                  <p style={{ fontWeight: 600, marginBottom: 6 }}>{label}</p>
+                  {income && (
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 3 }}>
+                      <span style={{ color: isDark ? "#6ee7b7" : "#059669" }}>Income</span>
+                      <span style={{ fontWeight: 600, fontVariantNumeric: "tabular-nums", color: isDark ? "#10b981" : "#059669" }}>
+                        {formatCurrency(income.value as number, currency)}
+                      </span>
+                    </div>
+                  )}
+                  {expenses && (
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                      <span style={{ color: isDark ? "#fda4af" : "#e11d48" }}>Expenses</span>
+                      <span style={{ fontWeight: 600, fontVariantNumeric: "tabular-nums", color: isDark ? "#f43f5e" : "#e11d48" }}>
+                        {formatCurrency(expenses.value as number, currency)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              );
+            }}
             cursor={{ stroke: gridColor, strokeWidth: 1 }}
           />
 
@@ -301,9 +224,29 @@ function MonthlyTrendsChart({
   );
 }
 
+// ── Custom active dot (glow ring) ─────────────────────────────────────────────
+
+function ActiveDot({
+  cx,
+  cy,
+  fill,
+}: {
+  cx?: number;
+  cy?: number;
+  fill?: string;
+}) {
+  if (cx === undefined || cy === undefined) return null;
+  return (
+    <g>
+      <circle cx={cx} cy={cy} r={9} fill={fill} opacity={0.2} />
+      <circle cx={cx} cy={cy} r={5} fill={fill} stroke="white" strokeWidth={1.5} />
+    </g>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
-export function SpendingChart({ transactions }: SpendingChartProps) {
+export function SpendingChart({ transactions, currency }: SpendingChartProps) {
   const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
@@ -320,6 +263,7 @@ export function SpendingChart({ transactions }: SpendingChartProps) {
 
   const categoryData = buildCategoryData(transactions);
   const trendData    = buildMonthlyTrends(transactions);
+  const symbol       = getCurrencySymbol(currency);
 
   const totalIncome   = transactions.filter((t) => t.type === "income")
     .reduce((s, t) => s + Number(t.amount), 0);
@@ -364,13 +308,29 @@ export function SpendingChart({ transactions }: SpendingChartProps) {
                     <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-border" />
                     <XAxis dataKey="name" hide />
                     <YAxis
-                      tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
+                      tickFormatter={(v) => `${symbol}${(v / 1000).toFixed(0)}k`}
                       tick={{ fontSize: 11 }}
                       axisLine={false}
                       tickLine={false}
                       width={40}
                     />
-                    <Tooltip content={<BarTooltip />} cursor={{ fill: "transparent" }} />
+                    <Tooltip
+                      content={({ active, payload }) => {
+                        if (!active || !payload?.length) return null;
+                        return (
+                          <div className="rounded-lg border bg-background px-3 py-2 text-sm shadow-md space-y-1">
+                            {payload.map((p) => (
+                              <div key={p.name} className="flex items-center gap-2">
+                                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: p.fill as string }} />
+                                <span className="text-muted-foreground">{p.name}</span>
+                                <span className="font-medium tabular-nums">{formatCurrency(p.value as number, currency)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      }}
+                      cursor={{ fill: "transparent" }}
+                    />
                     <Bar dataKey="Income"   name="Income"   fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={72} />
                     <Bar dataKey="Expenses" name="Expenses" fill="#f43f5e" radius={[4, 4, 0, 0]} maxBarSize={72} />
                   </BarChart>
@@ -383,14 +343,14 @@ export function SpendingChart({ transactions }: SpendingChartProps) {
                   <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
                   <span className="text-muted-foreground">Income</span>
                   <span className="font-semibold tabular-nums text-emerald-600">
-                    {formatCurrency(totalIncome)}
+                    {formatCurrency(totalIncome, currency)}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 text-sm">
                   <span className="h-2.5 w-2.5 rounded-full bg-rose-500" />
                   <span className="text-muted-foreground">Expenses</span>
                   <span className="font-semibold tabular-nums text-rose-600">
-                    {formatCurrency(totalExpenses)}
+                    {formatCurrency(totalExpenses, currency)}
                   </span>
                 </div>
               </div>
@@ -419,7 +379,7 @@ export function SpendingChart({ transactions }: SpendingChartProps) {
                   Expenses
                 </div>
               </div>
-              <MonthlyTrendsChart trendData={trendData} isDark={isDark} />
+              <MonthlyTrendsChart trendData={trendData} isDark={isDark} currency={currency} />
             </div>
 
             {/* ── Spending by category ── */}
@@ -449,7 +409,17 @@ export function SpendingChart({ transactions }: SpendingChartProps) {
                               <Cell key={entry.name} fill={entry.color} />
                             ))}
                           </Pie>
-                          <Tooltip content={<CustomTooltip />} />
+                          <Tooltip
+                            content={({ active, payload }) => {
+                              if (!active || !payload?.length) return null;
+                              return (
+                                <div className="rounded-lg border bg-background px-3 py-2 text-sm shadow-md">
+                                  <p className="font-medium">{payload[0].name}</p>
+                                  <p className="text-muted-foreground">{formatCurrency(payload[0].value as number, currency)}</p>
+                                </div>
+                              );
+                            }}
+                          />
                         </PieChart>
                       </ResponsiveContainer>
                     </div>
@@ -471,7 +441,7 @@ export function SpendingChart({ transactions }: SpendingChartProps) {
                               {pct}%
                             </span>
                             <span className="tabular-nums font-medium">
-                              {formatCurrency(entry.value)}
+                              {formatCurrency(entry.value, currency)}
                             </span>
                           </li>
                         );

@@ -18,8 +18,10 @@ import type { Transaction } from "@/types";
 
 export function TransactionSection({
   transactions,
+  currency,
 }: {
   transactions: Transaction[];
+  currency: string;
 }) {
   const [search, setSearch]               = useState("");
   const [typeFilter, setTypeFilter]       = useState("all");
@@ -191,7 +193,7 @@ export function TransactionSection({
           </p>
         </div>
       ) : (
-        <TransactionList transactions={filtered} />
+        <TransactionList transactions={filtered} currency={currency} />
       )}
     </div>
   );

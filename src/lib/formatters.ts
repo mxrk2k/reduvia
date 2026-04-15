@@ -1,14 +1,12 @@
-import { CURRENCY, CURRENCY_LOCALE } from "./constants";
-
-export function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat(CURRENCY_LOCALE, {
+export function formatCurrency(amount: number, currency = "USD"): string {
+  return new Intl.NumberFormat("en-US", {
     style: "currency",
-    currency: CURRENCY,
+    currency,
   }).format(amount);
 }
 
 export function formatDate(date: string | Date): string {
-  return new Intl.DateTimeFormat(CURRENCY_LOCALE, {
+  return new Intl.DateTimeFormat("en-US", {
     year: "numeric",
     month: "short",
     day: "numeric",

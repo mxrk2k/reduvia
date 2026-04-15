@@ -5,6 +5,8 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { LogoutButton } from "@/app/dashboard/_components/logout-button";
 import { BudgetList } from "./_components/budget-list";
 import { AddBudgetDialog } from "./_components/add-budget-dialog";
+import { getUserPreferences } from "@/app/actions/user-preferences";
+import { DEFAULT_CURRENCY } from "@/lib/currencies";
 import type { Budget } from "@/types";
 
 export default async function BudgetsPage() {
@@ -26,13 +28,16 @@ export default async function BudgetsPage() {
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
   const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
 
-  const { data: transactions } = await supabase
-    .from("transactions")
-    .select("category, amount")
-    .eq("user_id", user.id)
-    .eq("type", "expense")
-    .gte("created_at", startOfMonth)
-    .lt("created_at", startOfNextMonth);
+  const [{ data: transactions }, preferences] = await Promise.all([
+    supabase
+      .from("transactions")
+      .select("category, amount")
+      .eq("user_id", user.id)
+      .eq("type", "expense")
+      .gte("created_at", startOfMonth)
+      .lt("created_at", startOfNextMonth),
+    getUserPreferences(),
+  ]);
 
   const spendingByCategory: Record<string, number> = {};
   for (const tx of transactions ?? []) {
@@ -45,6 +50,8 @@ export default async function BudgetsPage() {
     ...b,
     spent: spendingByCategory[b.category] ?? 0,
   }));
+
+  const currency = preferences?.preferred_currency ?? DEFAULT_CURRENCY;
 
   return (
     <div className="min-h-screen bg-muted/40">
@@ -78,7 +85,7 @@ export default async function BudgetsPage() {
           />
         </div>
 
-        <BudgetList budgets={budgetsWithSpending} />
+        <BudgetList budgets={budgetsWithSpending} currency={currency} />
       </main>
     </div>
   );

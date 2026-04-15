@@ -2,7 +2,11 @@ import { TriangleAlert, Sparkles } from "lucide-react";
 import { getSpendingAnomalies } from "@/app/actions/insights";
 import { formatCurrency } from "@/lib/formatters";
 
-export async function InsightsCard() {
+interface InsightsCardProps {
+  currency: string;
+}
+
+export async function InsightsCard({ currency }: InsightsCardProps) {
   const anomalies = await getSpendingAnomalies();
 
   if (anomalies.length === 0) return null;
@@ -31,9 +35,9 @@ export async function InsightsCard() {
             <div className="min-w-0 flex-1">
               <p className="text-sm leading-snug">{a.insight}</p>
               <p className="mt-1.5 text-xs text-muted-foreground">
-                {formatCurrency(a.currentAmount)} this month
+                {formatCurrency(a.currentAmount, currency)} this month
                 <span className="mx-1.5 opacity-40">·</span>
-                {formatCurrency(a.averageAmount)} avg last 3 months
+                {formatCurrency(a.averageAmount, currency)} avg last 3 months
               </p>
             </div>
 

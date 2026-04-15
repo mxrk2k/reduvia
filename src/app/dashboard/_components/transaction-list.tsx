@@ -13,9 +13,10 @@ import type { Transaction } from "@/types";
 
 interface TransactionListProps {
   transactions: Transaction[];
+  currency: string;
 }
 
-export function TransactionList({ transactions }: TransactionListProps) {
+export function TransactionList({ transactions, currency }: TransactionListProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const router = useRouter();
 
@@ -79,7 +80,7 @@ export function TransactionList({ transactions }: TransactionListProps) {
             }`}
           >
             {t.type === "income" ? "+" : "-"}
-            {formatCurrency(Number(t.amount))}
+            {formatCurrency(Number(t.amount), currency)}
           </span>
 
           {/* Edit */}

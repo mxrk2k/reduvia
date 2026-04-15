@@ -2,7 +2,11 @@ import { TriangleAlert, OctagonAlert, Sparkles } from "lucide-react";
 import { getBudgetPredictions } from "@/app/actions/insights";
 import { formatCurrency } from "@/lib/formatters";
 
-export async function BudgetPredictionsCard() {
+interface BudgetPredictionsCardProps {
+  currency: string;
+}
+
+export async function BudgetPredictionsCard({ currency }: BudgetPredictionsCardProps) {
   const predictions = await getBudgetPredictions();
 
   if (predictions.length === 0) return null;
@@ -69,8 +73,8 @@ export async function BudgetPredictionsCard() {
                     </div>
                     <div className="flex items-center justify-between text-xs text-muted-foreground">
                       <span>
-                        {formatCurrency(p.currentSpend)}{" "}
-                        <span className="opacity-60">of {formatCurrency(p.budgetAmount)}</span>
+                        {formatCurrency(p.currentSpend, currency)}{" "}
+                        <span className="opacity-60">of {formatCurrency(p.budgetAmount, currency)}</span>
                       </span>
                       <span>{fillPct}% used</span>
                     </div>
@@ -81,7 +85,7 @@ export async function BudgetPredictionsCard() {
                 <div className="shrink-0 text-right">
                   <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${theme.badge}`}>
                     {p.alreadyExceeded ? "+" : "proj. +"}
-                    {formatCurrency(Math.abs(overage))}
+                    {formatCurrency(Math.abs(overage), currency)}
                   </span>
                   {!p.alreadyExceeded && (
                     <p className="mt-1 text-[11px] text-muted-foreground">

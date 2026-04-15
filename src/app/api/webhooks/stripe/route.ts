@@ -3,6 +3,7 @@ import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
 import { getStripeClient } from "@/lib/stripe";
 import { captureServerEvent } from "@/lib/posthog";
+import { sendProWelcomeEmail } from "@/app/actions/emails";
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const body      = await request.text();
@@ -52,6 +53,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         customer_id:     customerId,
         subscription_id: subId,
       });
+
+      // Send Pro welcome email — look up the user's email via the admin API
+      const { data: userData } = await supabase.auth.admin.getUserById(
+        session.client_reference_id
+      );
+      if (userData?.user?.email) {
+        await sendProWelcomeEmail(
+          userData.user.email,
+          userData.user.user_metadata?.full_name ?? null
+        );
+      }
     }
   }
 

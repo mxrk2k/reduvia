@@ -13,9 +13,10 @@ import type { Transaction } from "@/types";
 
 interface DueSoonProps {
   transactions: Transaction[];
+  currency: string;
 }
 
-export function DueSoon({ transactions }: DueSoonProps) {
+export function DueSoon({ transactions, currency }: DueSoonProps) {
   const [processing, setProcessing] = useState(false);
   const router = useRouter();
 
@@ -128,7 +129,7 @@ export function DueSoon({ transactions }: DueSoonProps) {
                   }`}
                 >
                   {t.type === "income" ? "+" : "−"}
-                  {formatCurrency(Number(t.amount))}
+                  {formatCurrency(Number(t.amount), currency)}
                 </span>
               </div>
             </div>

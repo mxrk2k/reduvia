@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { captureServerEvent } from "@/lib/posthog";
+import { sendWelcomeEmail } from "@/app/actions/emails";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
@@ -24,6 +25,13 @@ export async function GET(request: NextRequest) {
       isNewUser ? "user_signed_up" : "user_logged_in",
       { method: "google" }
     );
+
+    if (isNewUser && data.user.email) {
+      await sendWelcomeEmail(
+        data.user.email,
+        data.user.user_metadata?.full_name ?? null
+      );
+    }
   }
 
   return NextResponse.redirect(new URL("/dashboard", request.url));
