@@ -29,12 +29,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     await supabase
       .from("user_preferences")
       .update({
-        subscription_tier:    "pro",
-        subscription_status:  "active",
+        subscription_tier:      "pro",
+        subscription_status:    "active",
+        stripe_customer_id:     customerId,
         stripe_subscription_id: subId,
         updated_at: new Date().toISOString(),
       })
-      .eq("stripe_customer_id", customerId);
+      .eq("user_id", session.client_reference_id!);
   }
 
   // ── customer.subscription.deleted ────────────────────────────────────────

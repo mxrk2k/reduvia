@@ -44,11 +44,12 @@ export async function createCheckoutSession(): Promise<never> {
   }
 
   const session = await stripe.checkout.sessions.create({
-    customer:    customerId,
-    mode:        "subscription",
-    line_items:  [{ price: process.env.STRIPE_PRICE_ID!, quantity: 1 }],
-    success_url: `${APP_URL}/dashboard?upgraded=true`,
-    cancel_url:  `${APP_URL}/pricing`,
+    customer:             customerId,
+    client_reference_id:  user.id,
+    mode:                 "subscription",
+    line_items:           [{ price: process.env.STRIPE_PRICE_ID!, quantity: 1 }],
+    success_url:          `${APP_URL}/dashboard?upgraded=true`,
+    cancel_url:           `${APP_URL}/pricing`,
   });
 
   redirect(session.url!);
