@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { isProUser } from "@/lib/stripe";
 import type { TransactionType, TransactionCategory, RecurringFrequency } from "@/types";
 
 type ActionResult = { error: string } | null;
@@ -52,6 +53,11 @@ export async function addTransaction(data: {
   if (authError || !user) return { error: "Not authenticated" };
 
   const isRecurring = data.is_recurring ?? false;
+
+  // Recurring transactions are Pro-only
+  if (isRecurring && !(await isProUser(user.id))) {
+    return { error: "Recurring transactions are a Pro feature. Upgrade to Pro at /pricing" };
+  }
 
   const { error } = await supabase.from("transactions").insert({
     user_id:             user.id,

@@ -16,6 +16,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { parsePdfStatement } from "@/lib/parsers";
+import { isProUser } from "@/lib/stripe";
 import type { ParsedTransaction } from "@/lib/parsers";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -213,6 +214,13 @@ export async function importBankStatement(
     error: authError,
   } = await supabase.auth.getUser();
   if (authError || !user) throw new Error("Not authenticated.");
+
+  // ── Pro gate ──────────────────────────────────────────────────────────────
+  if (!(await isProUser(user.id))) {
+    throw new Error(
+      "Bank statement import is a Pro feature. Upgrade at /pricing"
+    );
+  }
 
   // ── 1. Extract and validate file ──────────────────────────────────────────
   const file = formData.get("file");

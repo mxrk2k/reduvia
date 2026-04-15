@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X, LayoutDashboard, PiggyBank, Building2, Upload, ChevronRight } from "lucide-react";
+import { Menu, X, LayoutDashboard, PiggyBank, Building2, Upload, ChevronRight, CreditCard, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { BankAccountSummary } from "@/app/actions/bank-statements";
 
@@ -155,8 +155,8 @@ export function HamburgerMenu({ bankAccounts }: HamburgerMenuProps) {
               )}
             </nav>
 
-            {/* Import link at the bottom */}
-            <div className="border-t p-3">
+            {/* Bottom links */}
+            <div className="border-t p-3 space-y-0.5">
               <Link
                 href="/import"
                 className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
@@ -167,6 +167,28 @@ export function HamburgerMenu({ bankAccounts }: HamburgerMenuProps) {
               >
                 <Upload className="h-4 w-4 shrink-0" />
                 Import Statement
+              </Link>
+              <Link
+                href="/pricing"
+                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                  pathname === "/pricing"
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                }`}
+              >
+                <Zap className="h-4 w-4 shrink-0" />
+                Pricing
+              </Link>
+              <Link
+                href="/billing"
+                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                  pathname === "/billing"
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                }`}
+              >
+                <CreditCard className="h-4 w-4 shrink-0" />
+                Billing
               </Link>
             </div>
           </div>
