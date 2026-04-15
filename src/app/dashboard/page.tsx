@@ -10,6 +10,7 @@ import { DueSoon } from "./_components/due-soon";
 import { HamburgerMenu } from "./_components/hamburger-menu";
 import { OnboardingPopup } from "./_components/onboarding-popup";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { DownloadAppButton } from "./_components/download-app-dialog";
 import { getBankAccounts } from "@/app/actions/bank-statements";
 import { getUserPreferences } from "@/app/actions/user-preferences";
 import type { Transaction } from "@/types";
@@ -80,6 +81,7 @@ export default async function DashboardPage() {
             >
               Budgets
             </Link>
+            <DownloadAppButton />
             <ThemeToggle />
             <LogoutButton />
           </div>
