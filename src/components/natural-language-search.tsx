@@ -13,9 +13,10 @@ import type { Transaction } from "@/types";
 interface Props {
   isPro: boolean;
   transactions: Transaction[];
+  currency?: string;
 }
 
-export function NaturalLanguageSearch({ isPro, transactions }: Props) {
+export function NaturalLanguageSearch({ isPro, transactions, currency = "USD" }: Props) {
   const [query, setQuery]     = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult]   = useState<NLSearchResult | null>(null);
@@ -134,7 +135,7 @@ export function NaturalLanguageSearch({ isPro, transactions }: Props) {
               <p className="mt-1 text-xs text-muted-foreground">Try rephrasing your search.</p>
             </div>
           ) : (
-            <TransactionList transactions={result.transactions} />
+            <TransactionList transactions={result.transactions} currency={currency} />
           )}
         </div>
       )}

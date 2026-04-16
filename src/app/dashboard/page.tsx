@@ -139,7 +139,7 @@ export default async function DashboardPage() {
         <Separator />
 
         {/* AI natural language search */}
-        <NaturalLanguageSearch isPro={isPro} transactions={txList} />
+        <NaturalLanguageSearch isPro={isPro} transactions={txList} currency={currency} />
 
         {/* Transactions section */}
         <TransactionSection transactions={txList} currency={currency} />
