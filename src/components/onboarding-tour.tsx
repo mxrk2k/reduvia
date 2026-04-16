@@ -53,11 +53,21 @@ const PAD = 12;
 // Border radius of the spotlight cutout
 const CUTOUT_R = 10;
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function measureTarget(targetId: string): DOMRect | null {
+  const el = document.querySelector<Element>(`[data-tour="${targetId}"]`);
+  if (!el) return null;
+  return el.getBoundingClientRect();
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function OnboardingTour({ show }: { show: boolean }) {
   const [visible, setVisible] = useState(show);
   const [step, setStep] = useState(0);
+  // null  → no spotlight (centred modal)
+  // DOMRect → spotlight at that position
   const [rect, setRect] = useState<DOMRect | null>(null);
   const [winSize, setWinSize] = useState({ w: 0, h: 0 });
   const confettiRef = useRef<HTMLCanvasElement>(null);
@@ -66,7 +76,7 @@ export function OnboardingTour({ show }: { show: boolean }) {
   const currentStep = STEPS[step];
   const isLast = step === STEPS.length - 1;
 
-  // Track window size for tooltip placement
+  // ── Window size (for tooltip placement) ──────────────────────────────────
   useEffect(() => {
     function update() {
       setWinSize({ w: window.innerWidth, h: window.innerHeight });
@@ -76,31 +86,56 @@ export function OnboardingTour({ show }: { show: boolean }) {
     return () => window.removeEventListener("resize", update);
   }, []);
 
-  // Measure target element whenever step changes
+  // ── Spotlight measurement ─────────────────────────────────────────────────
+  // Runs whenever `step` or `visible` changes.
+  // Always clears `rect` first (removes stale spotlight), then re-queries the
+  // target element after a 100 ms delay so the DOM has fully settled.
   useEffect(() => {
     if (!visible) return;
-    const targetId = currentStep.target;
-    if (!targetId) {
-      setRect(null);
-      return;
-    }
-    const el = document.querySelector(`[data-tour="${targetId}"]`);
-    if (!el) {
-      setRect(null);
-      return;
-    }
-    el.scrollIntoView({ behavior: "smooth", block: "center" });
-    // Small delay to allow scroll to settle before measuring
-    const t = setTimeout(() => {
-      setRect(el.getBoundingClientRect());
-    }, 120);
-    return () => clearTimeout(t);
-  }, [step, visible, currentStep.target]);
 
-  // Confetti on last step
+    // 1. Clear immediately so no stale spotlight is shown while we measure.
+    setRect(null);
+
+    const targetId = STEPS[step].target;
+    if (!targetId) {
+      // No spotlight for this step — stay null (centred modal).
+      return;
+    }
+
+    const t = setTimeout(() => {
+      // 2. Re-query the element fresh from the live DOM at measurement time.
+      const el = document.querySelector<HTMLElement>(`[data-tour="${targetId}"]`);
+      if (!el) {
+        // Element not found — fall back to centred modal, tour continues.
+        setRect(null);
+        return;
+      }
+
+      const r = el.getBoundingClientRect();
+      const inView = r.top >= 0 && r.bottom <= window.innerHeight;
+
+      if (!inView) {
+        // Scroll into view, then re-measure after scroll settles.
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        setTimeout(() => {
+          const fresh = document.querySelector<HTMLElement>(
+            `[data-tour="${targetId}"]`
+          );
+          if (fresh) setRect(fresh.getBoundingClientRect());
+        }, 380);
+      } else {
+        setRect(r);
+      }
+    }, 100);
+
+    return () => clearTimeout(t);
+  }, [step, visible]); // dep on `step` only — always re-queries the DOM fresh
+
+  // ── Confetti (last step) ──────────────────────────────────────────────────
   useEffect(() => {
     if (!isLast || confettiStarted.current) return;
     confettiStarted.current = true;
+
     const canvas = confettiRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -152,6 +187,7 @@ export function OnboardingTour({ show }: { show: boolean }) {
     return () => { alive = false; };
   }, [isLast]);
 
+  // ── Actions ───────────────────────────────────────────────────────────────
   const advance = useCallback(async () => {
     if (isLast) {
       await completeOnboarding();
@@ -168,33 +204,38 @@ export function OnboardingTour({ show }: { show: boolean }) {
 
   if (!visible) return null;
 
-  const hasTarget = !!rect && !!currentStep.target;
+  // A spotlight is shown only when we have a valid measured rect AND the
+  // current step actually has a target (guards against stale rect from prev step).
+  const hasTarget = rect !== null && currentStep.target !== null;
 
-  // Spotlight geometry
-  const spotX = rect ? rect.left - PAD : 0;
-  const spotY = rect ? rect.top - PAD : 0;
-  const spotW = rect ? rect.width + PAD * 2 : 0;
-  const spotH = rect ? rect.height + PAD * 2 : 0;
+  // Spotlight geometry (safe — only used when hasTarget is true)
+  const spotX = hasTarget ? rect!.left - PAD : 0;
+  const spotY = hasTarget ? rect!.top - PAD : 0;
+  const spotW = hasTarget ? rect!.width + PAD * 2 : 0;
+  const spotH = hasTarget ? rect!.height + PAD * 2 : 0;
 
-  // Tooltip placement: below spotlight if it fits, else above
-  const tooltipW = 320;
-  const tooltipH = 200; // approximate
-  let tooltipTop: number | undefined;
-  let tooltipLeft: number | undefined;
-  let tooltipTransform: string | undefined;
+  // Tooltip placement
+  const TOOLTIP_W = 320;
+  const TOOLTIP_H = 210; // approximate
+
+  let tooltipStyle: React.CSSProperties;
 
   if (hasTarget) {
     const below = spotY + spotH + 16;
-    const above = spotY - tooltipH - 12;
-    tooltipTop = below + tooltipH < winSize.h ? below : Math.max(8, above);
-    tooltipLeft = Math.max(
+    const above = spotY - TOOLTIP_H - 12;
+    const top =
+      below + TOOLTIP_H < winSize.h ? below : Math.max(8, above);
+    const left = Math.max(
       8,
-      Math.min(spotX + spotW / 2 - tooltipW / 2, winSize.w - tooltipW - 8)
+      Math.min(spotX + spotW / 2 - TOOLTIP_W / 2, winSize.w - TOOLTIP_W - 8)
     );
+    tooltipStyle = { top, left };
   } else {
-    tooltipTransform = "translate(-50%, -50%)";
-    tooltipTop = undefined;
-    tooltipLeft = undefined;
+    tooltipStyle = {
+      top: "50%",
+      left: "50%",
+      transform: "translate(-50%, -50%)",
+    };
   }
 
   return (
@@ -209,7 +250,7 @@ export function OnboardingTour({ show }: { show: boolean }) {
         />
       )}
 
-      {/* Dark overlay with spotlight cutout */}
+      {/* Overlay — either SVG cutout (has target) or solid dark (no target) */}
       {hasTarget ? (
         <svg
           aria-hidden="true"
@@ -219,7 +260,7 @@ export function OnboardingTour({ show }: { show: boolean }) {
         >
           <defs>
             <mask id="tour-mask">
-              {/* White = overlay visible, black = spotlight (transparent) */}
+              {/* white = opaque overlay, black = transparent cutout */}
               <rect width="100%" height="100%" fill="white" />
               <rect
                 x={spotX}
@@ -237,7 +278,7 @@ export function OnboardingTour({ show }: { show: boolean }) {
             fill="rgba(0,0,0,0.72)"
             mask="url(#tour-mask)"
           />
-          {/* Violet glow ring around spotlight */}
+          {/* Violet glow ring around the spotlight */}
           <rect
             x={spotX}
             y={spotY}
@@ -245,26 +286,24 @@ export function OnboardingTour({ show }: { show: boolean }) {
             height={spotH}
             rx={CUTOUT_R}
             fill="none"
-            stroke="rgba(124,58,237,0.65)"
+            stroke="rgba(124,58,237,0.7)"
             strokeWidth="1.5"
           />
         </svg>
       ) : (
-        <div className="fixed inset-0 z-50 bg-black/72" />
+        <div className="fixed inset-0 z-50 bg-black/[0.72]" />
       )}
 
       {/* Tooltip card */}
       <div
         className="fixed z-[51] rounded-2xl p-5"
         style={{
-          width: tooltipW,
+          width: TOOLTIP_W,
           background: "rgba(12,12,20,0.97)",
           border: "1px solid rgba(255,255,255,0.1)",
           boxShadow:
             "0 0 40px rgba(124,58,237,0.18), 0 20px 60px rgba(0,0,0,0.65)",
-          top: hasTarget ? tooltipTop : "50%",
-          left: hasTarget ? tooltipLeft : "50%",
-          transform: tooltipTransform,
+          ...tooltipStyle,
         }}
       >
         {/* Progress bar */}
