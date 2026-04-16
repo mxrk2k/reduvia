@@ -41,7 +41,7 @@ const STATUS_LABEL: Record<string, string> = {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function ImportForm({ isPro }: { isPro: boolean }) {
+export function ImportForm({ isPro: _isPro }: { isPro: boolean }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
