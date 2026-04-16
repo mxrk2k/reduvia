@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition, useCallback } from "react";
+import { useRef, useState, useTransition, useCallback, useEffect } from "react";
 import Link from "next/link";
 import {
   Upload,
@@ -9,12 +9,12 @@ import {
   AlertCircle,
   Loader2,
   X,
+  Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { importBankStatement } from "@/app/actions/bank-statements";
-import { RecurringSuggestions } from "@/components/recurring-suggestions";
-import type { ImportResult } from "@/app/actions/bank-statements";
+import { importBankStatement, getImportStatus } from "@/app/actions/bank-statements";
+import type { ImportJobQueued, ProcessingStatus } from "@/app/actions/bank-statements";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -34,28 +34,59 @@ function formatDateRange(from: string, to: string): string {
   return `${fmt(from)} – ${fmt(to)}`;
 }
 
+const STATUS_LABEL: Record<string, string> = {
+  pending:    "Queued for processing…",
+  processing: "Analyzing transactions with AI…",
+};
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function ImportForm({ isPro }: { isPro: boolean }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [result, setResult] = useState<ImportResult | null>(null);
+  const [processingJob, setProcessingJob] = useState<ImportJobQueued | null>(null);
+  const [pollingStatus, setPollingStatus] = useState<ProcessingStatus | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  // ── Polling ──────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!processingJob) return;
+    const done = pollingStatus?.status === "completed" || pollingStatus?.status === "failed";
+    if (done) return;
+
+    const id = setInterval(async () => {
+      try {
+        const status = await getImportStatus(processingJob.bankAccountId);
+        setPollingStatus(status);
+      } catch {
+        // keep polling on transient errors
+      }
+    }, 3000);
+
+    return () => clearInterval(id);
+  }, [processingJob, pollingStatus?.status]);
 
   // ── File selection ───────────────────────────────────────────────────────
 
   function selectFile(chosen: File | null) {
     if (!chosen) return;
     setFile(chosen);
-    setResult(null);
     setErrorMsg(null);
   }
 
   function clearFile() {
     setFile(null);
-    setResult(null);
+    setErrorMsg(null);
+    if (inputRef.current) inputRef.current.value = "";
+  }
+
+  function reset() {
+    setFile(null);
+    setProcessingJob(null);
+    setPollingStatus(null);
     setErrorMsg(null);
     if (inputRef.current) inputRef.current.value = "";
   }
@@ -87,10 +118,11 @@ export function ImportForm({ isPro }: { isPro: boolean }) {
       try {
         const formData = new FormData();
         formData.append("file", file);
-        const res = await importBankStatement(formData);
-        setResult(res);
+        const job = await importBankStatement(formData);
         setFile(null);
         if (inputRef.current) inputRef.current.value = "";
+        setProcessingJob(job);
+        setPollingStatus({ status: "pending" });
       } catch (err) {
         setErrorMsg(
           err instanceof Error
@@ -101,12 +133,14 @@ export function ImportForm({ isPro }: { isPro: boolean }) {
     });
   }
 
-  // ── Render ───────────────────────────────────────────────────────────────
+  // ── Processing state ─────────────────────────────────────────────────────
 
-  // ── Success state ──────────────────────────────────────────────────────
-  if (result) {
-    return (
-      <div className="space-y-6">
+  if (processingJob) {
+    const status = pollingStatus?.status ?? "pending";
+
+    if (status === "completed" && pollingStatus?.result) {
+      const { bankName, transactionCount, dateFrom, dateTo } = pollingStatus.result;
+      return (
         <Card>
           <CardContent className="flex flex-col items-center gap-4 py-10 text-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30">
@@ -120,55 +154,95 @@ export function ImportForm({ isPro }: { isPro: boolean }) {
               </p>
             </div>
 
-            {/* Result summary */}
             <div className="w-full max-w-sm rounded-lg border bg-muted/40 px-5 py-4 text-left space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Bank</span>
-                <span className="font-medium">{result.bankName}</span>
+                <span className="font-medium">{bankName}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Transactions</span>
-                <span className="font-medium tabular-nums">{result.transactionCount}</span>
+                <span className="font-medium tabular-nums">{transactionCount}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Date range</span>
                 <span className="font-medium tabular-nums text-right">
-                  {formatDateRange(result.dateFrom, result.dateTo)}
+                  {formatDateRange(dateFrom, dateTo)}
                 </span>
               </div>
             </div>
 
             <div className="flex flex-col gap-2 w-full max-w-sm sm:flex-row">
               <Link
-                href={`/bank/${result.bankAccountId}`}
+                href={`/bank/${processingJob.bankAccountId}`}
                 className="inline-flex flex-1 items-center justify-center rounded-lg bg-primary px-2.5 text-sm font-medium text-primary-foreground whitespace-nowrap transition-all hover:bg-primary/80 h-8"
               >
                 View Analysis
               </Link>
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={() => {
-                  setResult(null);
-                  setErrorMsg(null);
-                }}
-              >
+              <Button variant="outline" className="flex-1" onClick={reset}>
                 Import Another
               </Button>
             </div>
           </CardContent>
         </Card>
+      );
+    }
 
-        {/* Recurring suggestions — only rendered when detection found patterns */}
-        {result.recurringSuggestions.length > 0 && (
-          <RecurringSuggestions
-            suggestions={result.recurringSuggestions}
-            isPro={isPro}
-          />
-        )}
-      </div>
+    if (status === "failed") {
+      return (
+        <Card>
+          <CardContent className="flex flex-col items-center gap-4 py-10 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-destructive/10">
+              <AlertCircle className="h-7 w-7 text-destructive" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold">Processing failed</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Something went wrong while analyzing your statement. Please try again.
+              </p>
+            </div>
+            <Button variant="outline" onClick={reset}>
+              Try Again
+            </Button>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    // pending or processing
+    return (
+      <Card>
+        <CardContent className="flex flex-col items-center gap-4 py-10 text-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">
+            <Clock className="h-7 w-7 text-muted-foreground animate-pulse" />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold">Processing your statement</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {STATUS_LABEL[status] ?? "Processing…"}
+            </p>
+          </div>
+          <div className="w-full max-w-sm rounded-lg border bg-muted/40 px-5 py-3 text-left space-y-1.5">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Bank</span>
+              <span className="font-medium">{processingJob.bankName}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Date range</span>
+              <span className="font-medium tabular-nums text-right">
+                {formatDateRange(processingJob.dateFrom, processingJob.dateTo)}
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            Checking every few seconds…
+          </div>
+        </CardContent>
+      </Card>
     );
   }
+
+  // ── Upload form ──────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-4">
@@ -199,7 +273,6 @@ export function ImportForm({ isPro }: { isPro: boolean }) {
         />
 
         {file ? (
-          /* File selected */
           <>
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30">
               <FileText className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
@@ -222,7 +295,6 @@ export function ImportForm({ isPro }: { isPro: boolean }) {
             </Button>
           </>
         ) : (
-          /* Empty state */
           <>
             <div
               className={`flex h-12 w-12 items-center justify-center rounded-full transition-colors ${
@@ -265,7 +337,7 @@ export function ImportForm({ isPro }: { isPro: boolean }) {
         {isPending ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Analyzing transactions with AI...
+            Uploading…
           </>
         ) : (
           <>
@@ -277,7 +349,7 @@ export function ImportForm({ isPro }: { isPro: boolean }) {
 
       {isPending && (
         <p className="text-center text-xs text-muted-foreground animate-pulse">
-          This may take a moment while we categorize your transactions with AI.
+          Parsing your PDF, this will only take a moment…
         </p>
       )}
     </div>

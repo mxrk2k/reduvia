@@ -17,8 +17,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { parsePdfStatement } from "@/lib/parsers";
 import { isProUser } from "@/lib/stripe";
-import { detectAndSuggestRecurring } from "@/app/actions/insights";
-import { captureServerEvent } from "@/lib/posthog";
+import { inngest } from "@/lib/inngest";
 import type { ParsedTransaction } from "@/lib/parsers";
 import type { RecurringSuggestion } from "@/app/actions/insights";
 
@@ -63,6 +62,24 @@ export interface ImportResult {
   beginningBalance?: number;
   endingBalance?: number;
   recurringSuggestions: RecurringSuggestion[];
+}
+
+export interface ImportJobQueued {
+  bankAccountId: string;
+  statementId: string;
+  bankName: string;
+  dateFrom: string;
+  dateTo: string;
+}
+
+export interface ProcessingStatus {
+  status: "pending" | "processing" | "completed" | "failed";
+  result?: {
+    bankName: string;
+    transactionCount: number;
+    dateFrom: string;
+    dateTo: string;
+  };
 }
 
 export interface BankAccountSummary {
@@ -211,7 +228,7 @@ Rules:
  */
 export async function importBankStatement(
   formData: FormData
-): Promise<ImportResult> {
+): Promise<ImportJobQueued> {
   const supabase = createClient();
   const {
     data: { user },
@@ -271,7 +288,6 @@ export async function importBankStatement(
   if (existingAccounts && existingAccounts.length > 0) {
     bankAccountId = existingAccounts[0].id;
 
-    // Backfill account_last_four and account_type if not yet set
     const updates: Record<string, string> = {};
     if (!existingAccounts[0].account_last_four && accountLastFour) {
       updates.account_last_four = accountLastFour;
@@ -286,10 +302,10 @@ export async function importBankStatement(
     const { data: newAccount, error: insertAccountError } = await supabase
       .from("bank_accounts")
       .insert({
-        user_id:          user.id,
-        bank_name:        bankName,
+        user_id:           user.id,
+        bank_name:         bankName,
         account_last_four: accountLastFour ?? null,
-        account_type:      accountType ?? null,
+        account_type:      accountType     ?? null,
       })
       .select("id")
       .single();
@@ -314,10 +330,7 @@ export async function importBankStatement(
     throw new Error("This statement has already been imported.");
   }
 
-  // ── 5. AI categorisation ──────────────────────────────────────────────────
-  const categorized = await categorizeTransactions(rawTxns);
-
-  // ── 6. Create imported_statements record ──────────────────────────────────
+  // ── 5. Create statement record (transaction_count filled in by Inngest) ───
   const { data: statement, error: statementError } = await supabase
     .from("imported_statements")
     .insert({
@@ -326,7 +339,7 @@ export async function importBankStatement(
       file_name:         file.name,
       date_from:         dateFrom,
       date_to:           dateTo,
-      transaction_count: categorized.length,
+      transaction_count: 0,
       beginning_balance: beginningBalance ?? null,
       ending_balance:    endingBalance    ?? null,
       statement_period:  statementPeriod  ?? null,
@@ -338,56 +351,71 @@ export async function importBankStatement(
     throw new Error(statementError?.message ?? "Failed to create statement record.");
   }
 
-  // ── 7. Bulk insert bank_transactions ─────────────────────────────────────
-  const rows = categorized.map((t) => ({
-    user_id:           user.id,
-    bank_account_id:   bankAccountId,
-    statement_id:      statement.id,
-    date:              t.date,
-    description:       t.description,
-    clean_description: t.clean_description,
-    amount:            t.amount,
-    type:              t.type,
-    category:          t.category,
-  }));
+  // ── 6. Mark as pending and queue background job ───────────────────────────
+  await supabase
+    .from("bank_accounts")
+    .update({ processing_status: "pending" })
+    .eq("id", bankAccountId)
+    .eq("user_id", user.id);
 
-  const CHUNK = 500;
-  for (let i = 0; i < rows.length; i += CHUNK) {
-    const { error: txError } = await supabase
-      .from("bank_transactions")
-      .insert(rows.slice(i, i + CHUNK));
-    if (txError) throw new Error(`Failed to insert transactions: ${txError.message}`);
-  }
-
-  // ── 8. Analytics ──────────────────────────────────────────────────────────────
-  await captureServerEvent(user.id, "bank_statement_imported", {
-    bank_name:         bankName,
-    transaction_count: categorized.length,
+  await inngest.send({
+    name: "bank-statement/process",
+    data: {
+      userId:          user.id,
+      bankAccountId,
+      statementId:     statement.id,
+      rawTransactions: rawTxns,
+      bankName,
+    },
   });
 
-  // ── 9. Detect recurring patterns from the just-imported transactions ─────────
-  const recurringSuggestions = await detectAndSuggestRecurring(
-    categorized.map((t) => ({
-      date:              t.date,
-      description:       t.description,
-      clean_description: t.clean_description,
-      amount:            t.amount,
-      type:              t.type,
-      category:          t.category,
-    }))
-  );
+  return { bankAccountId, statementId: statement.id, bankName, dateFrom, dateTo };
+}
 
-  return {
-    bankAccountId,
-    bankName,
-    transactionCount: categorized.length,
-    dateFrom,
-    dateTo,
-    statementPeriod,
-    beginningBalance,
-    endingBalance,
-    recurringSuggestions,
-  };
+// ── getImportStatus ───────────────────────────────────────────────────────────
+
+export async function getImportStatus(
+  bankAccountId: string
+): Promise<ProcessingStatus> {
+  const supabase = createClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+  if (authError || !user) throw new Error("Not authenticated.");
+
+  const { data: account, error: accountError } = await supabase
+    .from("bank_accounts")
+    .select("processing_status, bank_name")
+    .eq("id", bankAccountId)
+    .eq("user_id", user.id)
+    .single();
+
+  if (accountError || !account) throw new Error("Bank account not found.");
+
+  const status = (account.processing_status ?? "completed") as ProcessingStatus["status"];
+
+  if (status === "completed") {
+    const { data: stmt } = await supabase
+      .from("imported_statements")
+      .select("transaction_count, date_from, date_to")
+      .eq("bank_account_id", bankAccountId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+
+    return {
+      status: "completed",
+      result: {
+        bankName:         account.bank_name,
+        transactionCount: stmt?.transaction_count ?? 0,
+        dateFrom:         stmt?.date_from ?? "",
+        dateTo:           stmt?.date_to   ?? "",
+      },
+    };
+  }
+
+  return { status };
 }
 
 // ── getBankAccounts ───────────────────────────────────────────────────────────
