@@ -135,6 +135,10 @@ export default async function SettingsPage() {
           </div>
         </div>
       </section>
+
+      <p className="mt-16 pb-4 text-center text-xs text-muted-foreground/50">
+        Reduvia v1.0.0
+      </p>
     </main>
   );
 }
