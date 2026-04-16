@@ -31,6 +31,12 @@ export default async function SettingsPage() {
 
   return (
     <main className="mx-auto max-w-2xl p-4 sm:p-6">
+      <Link
+        href="/dashboard"
+        className="mb-4 inline-block text-sm text-muted-foreground transition-colors hover:text-foreground"
+      >
+        ← Back to Dashboard
+      </Link>
       <h1 className="text-2xl font-semibold">Settings</h1>
 
       {/* Currency */}
