@@ -103,7 +103,7 @@ export default async function BankAccountPage({ params }: PageProps) {
               <span className="hidden sm:inline">Dashboard</span>
             </Link>
             <span className="text-muted-foreground/40 hidden sm:inline">/</span>
-            <h1 className="truncate text-base font-semibold sm:text-lg">
+            <h1 className="line-clamp-1 text-base font-semibold sm:text-lg">
               {account.bank_name} Analysis
             </h1>
           </div>
@@ -191,7 +191,7 @@ export default async function BankAccountPage({ params }: PageProps) {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+              <p className="text-xl font-bold tabular-nums text-emerald-600 sm:text-2xl dark:text-emerald-400">
                 {formatCurrency(summary.totalIncome)}
               </p>
             </CardContent>
@@ -205,7 +205,7 @@ export default async function BankAccountPage({ params }: PageProps) {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold tabular-nums text-rose-600 dark:text-rose-400">
+              <p className="text-xl font-bold tabular-nums text-rose-600 sm:text-2xl dark:text-rose-400">
                 {formatCurrency(summary.totalExpenses)}
               </p>
             </CardContent>
@@ -220,7 +220,7 @@ export default async function BankAccountPage({ params }: PageProps) {
             </CardHeader>
             <CardContent>
               <p
-                className={`text-2xl font-bold tabular-nums ${
+                className={`text-xl font-bold tabular-nums sm:text-2xl ${
                   balancePositive
                     ? "text-emerald-600 dark:text-emerald-400"
                     : "text-rose-600 dark:text-rose-400"

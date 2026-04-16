@@ -27,7 +27,7 @@ export function SummaryCards({ transactions, currency }: SummaryCardsProps) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-2xl font-bold text-emerald-600">
+          <p className="text-xl font-bold text-emerald-600 sm:text-2xl">
             {formatCurrency(totalIncome, currency)}
           </p>
         </CardContent>
@@ -40,7 +40,7 @@ export function SummaryCards({ transactions, currency }: SummaryCardsProps) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-2xl font-bold text-rose-600">
+          <p className="text-xl font-bold text-rose-600 sm:text-2xl">
             {formatCurrency(totalExpenses, currency)}
           </p>
         </CardContent>
@@ -54,7 +54,7 @@ export function SummaryCards({ transactions, currency }: SummaryCardsProps) {
         </CardHeader>
         <CardContent>
           <p
-            className={`text-2xl font-bold ${
+            className={`text-xl font-bold sm:text-2xl ${
               balance >= 0 ? "text-emerald-600" : "text-rose-600"
             }`}
           >

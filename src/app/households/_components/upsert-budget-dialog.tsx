@@ -90,7 +90,7 @@ export function UpsertBudgetDialog({
       <DialogTrigger>
         {isEdit ? (
           <button
-            className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:h-7 sm:w-7"
             aria-label={`Edit ${existing?.category} budget`}
           >
             <Pencil className="h-3.5 w-3.5" />
@@ -149,6 +149,7 @@ export function UpsertBudgetDialog({
             <Input
               id="budget-amount"
               type="number"
+              inputMode="decimal"
               step="0.01"
               min="0.01"
               placeholder="0.00"
@@ -162,10 +163,11 @@ export function UpsertBudgetDialog({
             <p className="text-sm font-medium text-destructive">{error}</p>
           )}
 
-          <div className="flex justify-end gap-2 pt-1">
+          <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
             <Button
               type="button"
               variant="outline"
+              className="w-full sm:w-auto"
               onClick={() => setOpen(false)}
             >
               Cancel
@@ -173,6 +175,7 @@ export function UpsertBudgetDialog({
             <Button
               type="submit"
               disabled={isPending || !category || !amount}
+              className="w-full sm:w-auto"
             >
               {isPending ? "Saving…" : isEdit ? "Update" : "Add"}
             </Button>

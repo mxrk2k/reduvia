@@ -100,7 +100,7 @@ function SuggestionCard({ suggestion, onAccepted, onDismissed }: SuggestionCardP
           <button
             onClick={handleAccept}
             disabled={isPending}
-            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50 sm:min-h-0"
             aria-label={`Add ${suggestion.merchant} as recurring`}
           >
             {isPending ? (
@@ -113,7 +113,7 @@ function SuggestionCard({ suggestion, onAccepted, onDismissed }: SuggestionCardP
           <button
             onClick={handleDismiss}
             disabled={isPending}
-            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50 sm:h-7 sm:w-7"
             aria-label={`Dismiss ${suggestion.merchant}`}
           >
             <X className="h-3.5 w-3.5" />

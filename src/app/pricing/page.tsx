@@ -71,11 +71,11 @@ export default async function PricingPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-4xl px-4 py-16">
+      <main className="mx-auto max-w-4xl px-4 py-8 sm:py-16">
         {/* Hero */}
-        <div className="mb-12 text-center">
-          <h1 className="text-4xl font-bold tracking-tight">Simple pricing</h1>
-          <p className="mt-3 text-lg text-muted-foreground">
+        <div className="mb-8 text-center sm:mb-12">
+          <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Simple pricing</h1>
+          <p className="mt-3 text-base text-muted-foreground sm:text-lg">
             Start free. Upgrade when you need more.
           </p>
         </div>
@@ -83,7 +83,7 @@ export default async function PricingPage() {
         {/* Cards */}
         <div className="grid gap-6 sm:grid-cols-2">
           {/* Free */}
-          <div className="flex flex-col rounded-2xl border bg-background p-8">
+          <div className="flex flex-col rounded-2xl border bg-background p-5 sm:p-8">
             <div className="mb-6">
               <p className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
                 Free
@@ -116,7 +116,7 @@ export default async function PricingPage() {
           </div>
 
           {/* Pro */}
-          <div className="relative flex flex-col rounded-2xl border-2 border-primary bg-background p-8">
+          <div className="relative flex flex-col rounded-2xl border-2 border-primary bg-background p-5 sm:p-8">
             <div className="absolute -top-3 left-1/2 -translate-x-1/2">
               <span className="rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground">
                 Most Popular

@@ -144,7 +144,7 @@ export function TransactionSection({
 
           {/* Type filter */}
           <Select value={typeFilter} onValueChange={(v) => v && setTypeFilter(v)}>
-            <SelectTrigger className="w-full sm:w-36">
+            <SelectTrigger className="w-full sm:w-36 min-h-[44px] sm:min-h-0">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -156,7 +156,7 @@ export function TransactionSection({
 
           {/* Category filter */}
           <Select value={categoryFilter} onValueChange={(v) => v && setCategoryFilter(v)}>
-            <SelectTrigger className="w-full sm:w-40">
+            <SelectTrigger className="w-full sm:w-40 min-h-[44px] sm:min-h-0">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

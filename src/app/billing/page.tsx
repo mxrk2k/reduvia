@@ -82,7 +82,7 @@ export default async function BillingPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-lg px-4 py-12">
+      <main className="mx-auto max-w-lg px-4 py-8 sm:py-12">
         <h1 className="mb-2 text-2xl font-bold tracking-tight">Billing</h1>
         <p className="mb-8 text-sm text-muted-foreground">
           Manage your subscription and billing details.
@@ -90,7 +90,7 @@ export default async function BillingPage() {
 
         {isPro ? (
           /* ── Pro card ─────────────────────────────────────────────────── */
-          <div className="rounded-2xl border-2 border-primary bg-background p-8">
+          <div className="rounded-2xl border-2 border-primary bg-background p-5 sm:p-8">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -138,7 +138,7 @@ export default async function BillingPage() {
           </div>
         ) : (
           /* ── Free card ────────────────────────────────────────────────── */
-          <div className="rounded-2xl border bg-background p-8">
+          <div className="rounded-2xl border bg-background p-5 sm:p-8">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">

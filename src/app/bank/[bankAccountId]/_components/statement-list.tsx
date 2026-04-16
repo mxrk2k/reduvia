@@ -75,7 +75,7 @@ export function StatementList({ statements }: StatementListProps) {
                   onClick={() => handleDelete(s)}
                   disabled={isPending}
                   aria-label={`Delete statement ${s.file_name}`}
-                  className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:pointer-events-none disabled:opacity-50"
+                  className="flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:pointer-events-none disabled:opacity-50 sm:h-7 sm:w-7"
                 >
                   {isDeleting ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />

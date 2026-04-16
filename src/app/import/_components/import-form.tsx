@@ -182,7 +182,7 @@ export function ImportForm({ isPro }: { isPro: boolean }) {
         onDrop={onDrop}
         onClick={() => !file && inputRef.current?.click()}
         onKeyDown={(e) => e.key === "Enter" && !file && inputRef.current?.click()}
-        className={`relative flex min-h-[200px] cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed px-6 py-8 transition-colors ${
+        className={`relative flex min-h-[160px] cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed px-6 py-8 transition-colors sm:min-h-[200px] ${
           isDragging
             ? "border-primary bg-primary/5"
             : file
@@ -205,7 +205,7 @@ export function ImportForm({ isPro }: { isPro: boolean }) {
               <FileText className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
             </div>
             <div className="text-center">
-              <p className="text-sm font-medium truncate max-w-[260px]">{file.name}</p>
+              <p className="w-full max-w-full truncate text-center text-sm font-medium">{file.name}</p>
               <p className="mt-0.5 text-xs text-muted-foreground">{formatBytes(file.size)}</p>
             </div>
             <Button

@@ -25,7 +25,7 @@ export default async function SettingsPage() {
     (prefs?.preferred_currency as string | undefined) ?? DEFAULT_CURRENCY;
 
   return (
-    <main className="mx-auto max-w-2xl p-6">
+    <main className="mx-auto max-w-2xl p-4 sm:p-6">
       <h1 className="text-2xl font-semibold">Settings</h1>
 
       {/* Currency */}
@@ -64,7 +64,7 @@ export default async function SettingsPage() {
             </div>
             <Link
               href="/billing"
-              className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors hover:bg-muted sm:w-auto sm:py-1.5"
             >
               <CreditCard className="h-4 w-4" />
               Manage Billing
