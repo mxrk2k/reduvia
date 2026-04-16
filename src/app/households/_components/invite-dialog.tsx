@@ -41,7 +41,7 @@ export function InviteDialog({ householdId }: InviteDialogProps) {
         setError(result.error);
         return;
       }
-      setInviteUrl(result.data.inviteUrl);
+      setInviteUrl("data" in result ? result.data.inviteUrl : "");
     });
   }
 
