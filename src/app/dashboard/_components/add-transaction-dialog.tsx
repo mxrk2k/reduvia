@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, type Resolver, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -8,6 +8,7 @@ import { z } from "zod";
 import { Plus, Pencil } from "lucide-react";
 
 import { addTransaction, updateTransaction } from "@/app/actions/transactions";
+import { getCustomCategories } from "@/app/actions/categories";
 import { INCOME_CATEGORIES, EXPENSE_CATEGORIES } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -80,7 +81,22 @@ export function AddTransactionDialog({
   const isEdit = !!transaction;
   const [open, setOpen] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [customIncomeCategories, setCustomIncomeCategories] = useState<string[]>([]);
+  const [customExpenseCategories, setCustomExpenseCategories] = useState<string[]>([]);
   const router = useRouter();
+
+  // Fetch custom categories once when the dialog first opens
+  useEffect(() => {
+    if (!open) return;
+    getCustomCategories().then((cats) => {
+      setCustomIncomeCategories(
+        cats.filter((c) => c.type === "income").map((c) => c.name)
+      );
+      setCustomExpenseCategories(
+        cats.filter((c) => c.type === "expense").map((c) => c.name)
+      );
+    });
+  }, [open]);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as Resolver<FormValues>,
@@ -107,7 +123,14 @@ export function AddTransactionDialog({
 
   const selectedType = form.watch("type");
   const isRecurring  = form.watch("is_recurring");
-  const categories   = selectedType === "income" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+
+  // Merge hardcoded + custom categories, deduplicated
+  const builtIn    = selectedType === "income" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+  const customList = selectedType === "income" ? customIncomeCategories : customExpenseCategories;
+  const categories = [
+    ...builtIn,
+    ...customList.filter((c) => !(builtIn as string[]).includes(c)),
+  ];
 
   async function onSubmit(values: FormValues) {
     setServerError(null);

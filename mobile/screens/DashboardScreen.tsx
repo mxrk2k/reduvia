@@ -24,6 +24,7 @@ import {
 
 import { supabase } from "../lib/supabase";
 import { COLORS } from "../lib/theme";
+import { syncWidgetData } from "../lib/widgetSync";
 import type { Transaction } from "../lib/types";
 
 // ── Formatters ─────────────────────────────────────────────────────────────────
@@ -587,6 +588,8 @@ export default function DashboardScreen() {
   useFocusEffect(
     useCallback(() => {
       fetchData();
+      // Sync session + summary to App Group so the iOS widget can read them
+      syncWidgetData();
     }, [])
   );
 

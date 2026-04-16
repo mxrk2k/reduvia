@@ -5,7 +5,9 @@ import { createClient } from "@/lib/supabase/server";
 import { DeleteAccountButton } from "@/components/delete-account-button";
 import { ExportDataButton } from "@/components/export-data-button";
 import { CurrencySelector } from "@/components/currency-selector";
+import { CustomCategoriesManager } from "@/components/custom-categories-manager";
 import { DEFAULT_CURRENCY } from "@/lib/currencies";
+import { getCustomCategories } from "@/app/actions/categories";
 
 export default async function SettingsPage() {
   const supabase = createClient();
@@ -15,14 +17,17 @@ export default async function SettingsPage() {
   } = await supabase.auth.getUser();
   if (authError || !user) redirect("/login");
 
-  const { data: prefs } = await supabase
-    .from("user_preferences")
-    .select("preferred_currency")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  const [prefsResult, customCategories] = await Promise.all([
+    supabase
+      .from("user_preferences")
+      .select("preferred_currency")
+      .eq("user_id", user.id)
+      .maybeSingle(),
+    getCustomCategories(),
+  ]);
 
   const preferredCurrency =
-    (prefs?.preferred_currency as string | undefined) ?? DEFAULT_CURRENCY;
+    (prefsResult.data?.preferred_currency as string | undefined) ?? DEFAULT_CURRENCY;
 
   return (
     <main className="mx-auto max-w-2xl p-4 sm:p-6">
@@ -45,6 +50,17 @@ export default async function SettingsPage() {
             </div>
             <CurrencySelector currentCurrency={preferredCurrency} />
           </div>
+        </div>
+      </section>
+
+      {/* Custom Categories */}
+      <section className="mt-10">
+        <h2 className="mb-1 text-base font-semibold">Custom Categories</h2>
+        <p className="mb-4 text-sm text-muted-foreground">
+          Add your own income and expense categories to use when logging transactions.
+        </p>
+        <div className="rounded-lg border p-4">
+          <CustomCategoriesManager initialCategories={customCategories} />
         </div>
       </section>
 
