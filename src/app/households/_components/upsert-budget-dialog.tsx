@@ -121,7 +121,7 @@ export function UpsertBudgetDialog({
             ) : (
               <Select
                 value={category}
-                onValueChange={setCategory}
+                onValueChange={(value) => { if (value !== null) setCategory(value); }}
                 required
               >
                 <SelectTrigger className="w-full">
