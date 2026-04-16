@@ -48,76 +48,73 @@ const STEPS = [
   },
 ] as const;
 
-// Padding around the target element's bounding rect
 const PAD = 8;
-// Border radius of the spotlight cutout
-const CUTOUT_R = 10;
+const TOOLTIP_W = 320;
+const TOOLTIP_H = 220;
+
+type SpotRect = { top: number; left: number; width: number; height: number };
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function OnboardingTour({ show }: { show: boolean }) {
-  const [visible, setVisible] = useState(show);
+  // Defer all rendering to the client to prevent hydration mismatches.
+  const [mounted, setMounted] = useState(false);
+  const [visible, setVisible] = useState(false);
   const [step, setStep] = useState(0);
-  // null  → no spotlight (centred modal)
-  // DOMRect → spotlight at that position
-  const [rect, setRect] = useState<DOMRect | null>(null);
-  const [winSize, setWinSize] = useState({ w: 0, h: 0 });
+  const [spot, setSpot] = useState<SpotRect | null>(null);
+
   const confettiRef = useRef<HTMLCanvasElement>(null);
   const confettiStarted = useRef(false);
 
   const currentStep = STEPS[step];
   const isLast = step === STEPS.length - 1;
 
-  // ── Window size (for tooltip placement) ──────────────────────────────────
+  // Mount client-side only, then show if needed.
   useEffect(() => {
-    function update() {
-      setWinSize({ w: window.innerWidth, h: window.innerHeight });
-    }
-    update();
-    window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
-  }, []);
+    setMounted(true);
+    if (show) setVisible(true);
+  }, [show]);
 
   // ── Spotlight measurement ─────────────────────────────────────────────────
-  // Runs on every step change. Clears stale rect immediately, then re-queries
-  // the target element after 150 ms so the DOM has fully settled. All stored
-  // values are viewport-relative (getBoundingClientRect) plus scroll offsets so
-  // the fixed SVG overlay and fixed tooltip card share the same coordinate space.
   useEffect(() => {
-    if (!visible) return;
+    if (!mounted || !visible) return;
 
-    // Clear stale rect immediately — prevents wrong spotlight flashing.
-    setRect(null);
+    // Clear stale spotlight immediately so no wrong highlight flashes.
+    setSpot(null);
 
     const targetId = STEPS[step].target;
-    if (!targetId) return; // centred modal for steps without a target
+    if (!targetId) return;
+
+    const measure = (el: HTMLElement) => {
+      const r = el.getBoundingClientRect();
+      setSpot({ top: r.top, left: r.left, width: r.width, height: r.height });
+    };
 
     const t = setTimeout(() => {
-      const el = document.querySelector<HTMLElement>(`[data-tour="${targetId}"]`);
-      if (!el) {
-        setRect(null); // element not found — fall back to centred modal
-        return;
-      }
+      const el = document.querySelector<HTMLElement>(
+        `[data-tour="${targetId}"]`
+      );
+      if (!el) return; // element not found — centred modal fallback
 
       const r = el.getBoundingClientRect();
       const inView = r.top >= 0 && r.bottom <= window.innerHeight;
 
       if (!inView) {
-        // Scroll into view, then re-measure once scroll settles.
         el.scrollIntoView({ behavior: "smooth", block: "center" });
+        // Re-measure after scroll animation settles.
         setTimeout(() => {
           const fresh = document.querySelector<HTMLElement>(
             `[data-tour="${targetId}"]`
           );
-          if (fresh) setRect(fresh.getBoundingClientRect());
+          if (fresh) measure(fresh);
         }, 400);
       } else {
-        setRect(r);
+        measure(el);
       }
     }, 150);
 
     return () => clearTimeout(t);
-  }, [step, visible]);
+  }, [step, mounted, visible]);
 
   // ── Confetti (last step) ──────────────────────────────────────────────────
   useEffect(() => {
@@ -137,7 +134,6 @@ export function OnboardingTour({ show }: { show: boolean }) {
       x: number; y: number; vx: number; vy: number;
       color: string; w: number; h: number; rot: number; rotV: number;
     };
-
     const flakes: Flake[] = Array.from({ length: 160 }, () => ({
       x: Math.random() * canvas.width,
       y: -10 - Math.random() * 80,
@@ -156,10 +152,7 @@ export function OnboardingTour({ show }: { show: boolean }) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       let any = false;
       for (const f of flakes) {
-        f.x += f.vx;
-        f.y += f.vy;
-        f.vy += 0.06;
-        f.rot += f.rotV;
+        f.x += f.vx; f.y += f.vy; f.vy += 0.06; f.rot += f.rotV;
         if (f.y < canvas.height + 20) any = true;
         ctx.save();
         ctx.translate(f.x, f.y);
@@ -190,150 +183,194 @@ export function OnboardingTour({ show }: { show: boolean }) {
     setVisible(false);
   }, []);
 
-  if (!visible) return null;
+  // Nothing on the server or before mount — prevents hydration mismatches.
+  if (!mounted || !visible) return null;
 
-  // Spotlight is shown only when rect is fresh AND the current step has a target.
-  // This guards against stale rect from a previous step leaking through.
-  const hasTarget = rect !== null && currentStep.target !== null;
+  // Spotlight is valid only when we have a fresh rect AND this step has a target.
+  const hasSpot = spot !== null && currentStep.target !== null;
 
-  // getBoundingClientRect() returns viewport-relative coords. The SVG overlay
-  // and tooltip card are both position:fixed, so their (0,0) is also the
-  // viewport top-left. We add window.scrollX/scrollY so the values remain
-  // correct when the page is scrolled and fixed-element layout is recalculated.
-  const scrollX = typeof window !== "undefined" ? window.scrollX : 0;
-  const scrollY = typeof window !== "undefined" ? window.scrollY : 0;
+  // Spotlight box geometry (fixed coords — getBoundingClientRect is viewport-relative).
+  const spotTop    = hasSpot ? spot!.top  - PAD : 0;
+  const spotLeft   = hasSpot ? spot!.left - PAD : 0;
+  const spotWidth  = hasSpot ? spot!.width  + PAD * 2 : 0;
+  const spotHeight = hasSpot ? spot!.height + PAD * 2 : 0;
 
-  const spotX = hasTarget ? rect!.left + scrollX - PAD : 0;
-  const spotY = hasTarget ? rect!.top  + scrollY - PAD : 0;
-  const spotW = hasTarget ? rect!.width  + PAD * 2 : 0;
-  const spotH = hasTarget ? rect!.height + PAD * 2 : 0;
-
-  // Tooltip placement — prefer below for elements in the top half of the
-  // viewport, above for elements in the bottom half.
-  const TOOLTIP_W = 320;
-  const TOOLTIP_H = 210;
-
+  // Tooltip position: below spotlight when target is in top half, above when in bottom half.
   let tooltipStyle: React.CSSProperties;
-
-  if (hasTarget) {
-    const elementCenterY = rect!.top + rect!.height / 2;
-    const inTopHalf = elementCenterY < winSize.h / 2;
+  if (hasSpot) {
+    const targetCenterY = spot!.top + spot!.height / 2;
+    const inTopHalf = targetCenterY < window.innerHeight / 2;
 
     const top = inTopHalf
-      ? spotY + spotH + 16                       // below the spotlight
-      : Math.max(8, spotY - TOOLTIP_H - 12);     // above the spotlight
+      ? spotTop + spotHeight + 16
+      : Math.max(8, spotTop - TOOLTIP_H - 12);
 
     const left = Math.max(
       8,
-      Math.min(spotX + spotW / 2 - TOOLTIP_W / 2, winSize.w - TOOLTIP_W - 8)
+      Math.min(
+        spotLeft + spotWidth / 2 - TOOLTIP_W / 2,
+        window.innerWidth - TOOLTIP_W - 8
+      )
     );
 
-    tooltipStyle = { top, left };
+    tooltipStyle = { position: "fixed", top, left, width: TOOLTIP_W };
   } else {
     tooltipStyle = {
+      position: "fixed",
       top: "50%",
       left: "50%",
       transform: "translate(-50%, -50%)",
+      width: TOOLTIP_W,
     };
   }
 
   return (
-    <div className="fixed inset-0 z-50" style={{ pointerEvents: "all" }}>
-      {/* Confetti canvas — last step only */}
+    <>
+      {/* ── Backdrop ──────────────────────────────────────────────────────── */}
+      {/* When there is no spotlight, render a plain dark overlay.
+          When there IS a spotlight, the overlay is created by the highlight
+          div's box-shadow spread — no separate backdrop needed. */}
+      {!hasSpot && (
+        <div
+          className="fixed inset-0 z-50"
+          style={{ backgroundColor: "rgba(0,0,0,0.72)" }}
+        />
+      )}
+
+      {/* ── Spotlight highlight box ───────────────────────────────────────── */}
+      {/* A transparent fixed div positioned over the target element.
+          box-shadow with a huge spread covers the rest of the screen dark,
+          the outline ring and glow make the spotlight feel intentional. */}
+      {hasSpot && (
+        <div
+          aria-hidden="true"
+          style={{
+            position: "fixed",
+            zIndex: 50,
+            top: spotTop,
+            left: spotLeft,
+            width: spotWidth,
+            height: spotHeight,
+            borderRadius: 10,
+            pointerEvents: "none",
+            boxShadow: [
+              "0 0 0 9999px rgba(0,0,0,0.72)",          // dark overlay
+              "0 0 0 2px rgba(124,58,237,0.75)",          // violet ring
+              "0 0 24px 4px rgba(124,58,237,0.35)",       // violet glow
+            ].join(", "),
+          }}
+        />
+      )}
+
+      {/* ── Confetti canvas (last step only) ─────────────────────────────── */}
       {isLast && (
         <canvas
           ref={confettiRef}
           aria-hidden="true"
-          className="pointer-events-none fixed inset-0 z-[51]"
-          style={{ width: "100%", height: "100%" }}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 51,
+            width: "100%",
+            height: "100%",
+            pointerEvents: "none",
+          }}
         />
       )}
 
-      {/* Overlay — either SVG cutout (has target) or solid dark (no target) */}
-      {hasTarget ? (
-        <svg
-          aria-hidden="true"
-          className="fixed inset-0 z-50"
-          style={{ width: "100%", height: "100%", pointerEvents: "all" }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <defs>
-            <mask id="tour-mask">
-              {/* white = opaque overlay, black = transparent cutout */}
-              <rect width="100%" height="100%" fill="white" />
-              <rect
-                x={spotX}
-                y={spotY}
-                width={spotW}
-                height={spotH}
-                rx={CUTOUT_R}
-                fill="black"
-              />
-            </mask>
-          </defs>
-          <rect
-            width="100%"
-            height="100%"
-            fill="rgba(0,0,0,0.72)"
-            mask="url(#tour-mask)"
-          />
-          {/* Violet glow ring around the spotlight */}
-          <rect
-            x={spotX}
-            y={spotY}
-            width={spotW}
-            height={spotH}
-            rx={CUTOUT_R}
-            fill="none"
-            stroke="rgba(124,58,237,0.7)"
-            strokeWidth="1.5"
-          />
-        </svg>
-      ) : (
-        <div className="fixed inset-0 z-50 bg-black/[0.72]" />
-      )}
-
-      {/* Tooltip card */}
+      {/* ── Tooltip card ─────────────────────────────────────────────────── */}
       <div
-        className="fixed z-[51] rounded-2xl p-5"
         style={{
-          width: TOOLTIP_W,
+          ...tooltipStyle,
+          zIndex: 51,
+          borderRadius: 16,
+          padding: 20,
           background: "rgba(12,12,20,0.97)",
           border: "1px solid rgba(255,255,255,0.1)",
           boxShadow:
             "0 0 40px rgba(124,58,237,0.18), 0 20px 60px rgba(0,0,0,0.65)",
-          ...tooltipStyle,
         }}
       >
         {/* Progress bar */}
-        <div className="mb-4 h-[3px] w-full overflow-hidden rounded-full bg-white/10">
+        <div
+          style={{
+            marginBottom: 16,
+            height: 3,
+            width: "100%",
+            overflow: "hidden",
+            borderRadius: 9999,
+            backgroundColor: "rgba(255,255,255,0.1)",
+          }}
+        >
           <div
-            className="h-full rounded-full bg-violet-500 transition-all duration-500"
-            style={{ width: `${((step + 1) / STEPS.length) * 100}%` }}
+            style={{
+              height: "100%",
+              borderRadius: 9999,
+              backgroundColor: "#7c3aed",
+              width: `${((step + 1) / STEPS.length) * 100}%`,
+              transition: "width 0.5s ease",
+            }}
           />
         </div>
 
         {/* Step counter */}
-        <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-white/30">
+        <p
+          style={{
+            marginBottom: 8,
+            fontSize: 11,
+            fontWeight: 600,
+            textTransform: "uppercase",
+            letterSpacing: "0.1em",
+            color: "rgba(255,255,255,0.3)",
+          }}
+        >
           Step {step + 1} of {STEPS.length}
         </p>
 
         {/* Title */}
-        <h3 className="mb-1.5 text-[15px] font-semibold text-white">
+        <h3
+          style={{
+            marginBottom: 6,
+            fontSize: 15,
+            fontWeight: 600,
+            color: "#fff",
+          }}
+        >
           {currentStep.title}
         </h3>
 
         {/* Body */}
-        <p className="text-sm leading-relaxed text-white/50">
+        <p
+          style={{
+            fontSize: 14,
+            lineHeight: 1.6,
+            color: "rgba(255,255,255,0.5)",
+          }}
+        >
           {currentStep.description}
         </p>
 
         {/* Actions */}
-        <div className="mt-5 flex items-center justify-between gap-3">
+        <div
+          style={{
+            marginTop: 20,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+          }}
+        >
           {!isLast ? (
             <button
               onClick={skip}
-              className="text-sm text-white/30 transition-colors hover:text-white/55"
+              style={{
+                background: "none",
+                border: "none",
+                padding: 0,
+                cursor: "pointer",
+                fontSize: 14,
+                color: "rgba(255,255,255,0.3)",
+              }}
             >
               Skip tour
             </button>
@@ -342,8 +379,15 @@ export function OnboardingTour({ show }: { show: boolean }) {
           )}
           <button
             onClick={advance}
-            className="rounded-lg px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 active:opacity-80"
             style={{
+              borderRadius: 8,
+              paddingInline: 16,
+              paddingBlock: 8,
+              fontSize: 14,
+              fontWeight: 600,
+              color: "#fff",
+              border: "none",
+              cursor: "pointer",
               background: "linear-gradient(135deg, #7c3aed 0%, #2563eb 100%)",
               boxShadow: "0 4px 16px rgba(124,58,237,0.4)",
             }}
@@ -352,6 +396,6 @@ export function OnboardingTour({ show }: { show: boolean }) {
           </button>
         </div>
       </div>
-    </div>
+    </>
   );
 }
