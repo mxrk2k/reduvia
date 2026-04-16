@@ -1,6 +1,9 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { randomReferralCode } from "@/lib/referral-utils";
+
+export { randomReferralCode };
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -10,17 +13,6 @@ export interface ReferralStats {
   invited: number;
   /** How many of those signups completed (same as invited in 1:1 model). */
   completed: number;
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-export function randomReferralCode(): string {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // unambiguous alphanumeric
-  let code = "";
-  for (let i = 0; i < 8; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return code;
 }
 
 // ── generateReferralCode ──────────────────────────────────────────────────────
