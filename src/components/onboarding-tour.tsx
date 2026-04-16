@@ -53,14 +53,6 @@ const PAD = 12;
 // Border radius of the spotlight cutout
 const CUTOUT_R = 10;
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function measureTarget(targetId: string): DOMRect | null {
-  const el = document.querySelector<Element>(`[data-tour="${targetId}"]`);
-  if (!el) return null;
-  return el.getBoundingClientRect();
-}
-
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function OnboardingTour({ show }: { show: boolean }) {
