@@ -61,7 +61,7 @@ export function InviteDialog({ householdId }: InviteDialogProps) {
         if (!o) reset();
       }}
     >
-      <DialogTrigger asChild>
+      <DialogTrigger>
         <Button variant="outline" size="sm" className="gap-1.5">
           <UserPlus className="h-4 w-4" />
           Invite Member
