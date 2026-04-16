@@ -2,6 +2,9 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { SUPPORTED_CURRENCIES, DEFAULT_CURRENCY } from "@/lib/currencies";
+import { getRedis } from "@/lib/redis";
+
+const PREFERENCES_TTL = 60 * 5; // 5 minutes
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -21,11 +24,23 @@ export async function getUserPreferences(): Promise<UserPreferences | null> {
   } = await supabase.auth.getUser();
   if (authError || !user) return null;
 
+  const redis = getRedis();
+  const cacheKey = `user:preferences:${user.id}`;
+
+  if (redis) {
+    const cached = await redis.get<UserPreferences>(cacheKey);
+    if (cached) return cached;
+  }
+
   const { data } = await supabase
     .from("user_preferences")
     .select("dismiss_import_prompt, preferred_currency, onboarding_completed")
     .eq("user_id", user.id)
     .maybeSingle();
+
+  if (redis && data) {
+    await redis.set(cacheKey, data, { ex: PREFERENCES_TTL });
+  }
 
   return data ?? null;
 }
@@ -79,6 +94,10 @@ export async function updateUserCurrency(
   );
 
   if (error) return { error: error.message };
+
+  const redis = getRedis();
+  if (redis) await redis.del(`user:preferences:${user.id}`);
+
   return null;
 }
 

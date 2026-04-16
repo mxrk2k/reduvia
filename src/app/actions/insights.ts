@@ -2,7 +2,11 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
+import { getRedis } from "@/lib/redis";
 import type { Transaction } from "@/types";
+
+const ANOMALIES_TTL   = 60 * 30;      // 30 minutes
+const HEALTH_SCORE_TTL = 60 * 60;     // 1 hour
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -423,6 +427,14 @@ export async function getSpendingAnomalies(): Promise<SpendingAnomaly[]> {
   } = await supabase.auth.getUser();
   if (authError || !user) return [];
 
+  const redis = getRedis();
+  const cacheKey = `user:anomalies:${user.id}`;
+
+  if (redis) {
+    const cached = await redis.get<SpendingAnomaly[]>(cacheKey);
+    if (cached) return cached;
+  }
+
   // ── Date bounds ─────────────────────────────────────────────────────────────
   const now = new Date();
   const currentYear  = now.getFullYear();
@@ -532,10 +544,14 @@ export async function getSpendingAnomalies(): Promise<SpendingAnomaly[]> {
     }
   }
 
-  return flagged.map((a) => ({
+  const result = flagged.map((a) => ({
     ...a,
     insight: insightMap[a.category] ?? fallbackInsight(a.category, a.percentageIncrease),
   }));
+
+  if (redis) await redis.set(cacheKey, result, { ex: ANOMALIES_TTL });
+
+  return result;
 }
 
 // ── getFinancialHealthScore ───────────────────────────────────────────────────
@@ -558,6 +574,14 @@ export async function getFinancialHealthScore(): Promise<FinancialHealthScore | 
     error: authError,
   } = await supabase.auth.getUser();
   if (authError || !user) return null;
+
+  const redis = getRedis();
+  const cacheKey = `user:health-score:${user.id}`;
+
+  if (redis) {
+    const cached = await redis.get<FinancialHealthScore>(cacheKey);
+    if (cached) return cached;
+  }
 
   // ── Date bounds: 3 complete calendar months, excluding current partial month ─
   const now          = new Date();
@@ -739,7 +763,11 @@ export async function getFinancialHealthScore(): Promise<FinancialHealthScore | 
     // Fallback — dashboard still works without AI explanation
   }
 
-  return { score, label: scoreLabel(score), factors, explanation };
+  const result: FinancialHealthScore = { score, label: scoreLabel(score), factors, explanation };
+
+  if (redis) await redis.set(cacheKey, result, { ex: HEALTH_SCORE_TTL });
+
+  return result;
 }
 
 // ── getBudgetPredictions ──────────────────────────────────────────────────────
