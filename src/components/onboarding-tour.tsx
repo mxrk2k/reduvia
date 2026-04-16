@@ -48,8 +48,8 @@ const STEPS = [
   },
 ] as const;
 
-// Spotlight padding around the target element
-const PAD = 12;
+// Padding around the target element's bounding rect
+const PAD = 8;
 // Border radius of the spotlight cutout
 const CUTOUT_R = 10;
 
@@ -79,27 +79,23 @@ export function OnboardingTour({ show }: { show: boolean }) {
   }, []);
 
   // ── Spotlight measurement ─────────────────────────────────────────────────
-  // Runs whenever `step` or `visible` changes.
-  // Always clears `rect` first (removes stale spotlight), then re-queries the
-  // target element after a 100 ms delay so the DOM has fully settled.
+  // Runs on every step change. Clears stale rect immediately, then re-queries
+  // the target element after 150 ms so the DOM has fully settled. All stored
+  // values are viewport-relative (getBoundingClientRect) plus scroll offsets so
+  // the fixed SVG overlay and fixed tooltip card share the same coordinate space.
   useEffect(() => {
     if (!visible) return;
 
-    // 1. Clear immediately so no stale spotlight is shown while we measure.
+    // Clear stale rect immediately — prevents wrong spotlight flashing.
     setRect(null);
 
     const targetId = STEPS[step].target;
-    if (!targetId) {
-      // No spotlight for this step — stay null (centred modal).
-      return;
-    }
+    if (!targetId) return; // centred modal for steps without a target
 
     const t = setTimeout(() => {
-      // 2. Re-query the element fresh from the live DOM at measurement time.
       const el = document.querySelector<HTMLElement>(`[data-tour="${targetId}"]`);
       if (!el) {
-        // Element not found — fall back to centred modal, tour continues.
-        setRect(null);
+        setRect(null); // element not found — fall back to centred modal
         return;
       }
 
@@ -107,21 +103,21 @@ export function OnboardingTour({ show }: { show: boolean }) {
       const inView = r.top >= 0 && r.bottom <= window.innerHeight;
 
       if (!inView) {
-        // Scroll into view, then re-measure after scroll settles.
+        // Scroll into view, then re-measure once scroll settles.
         el.scrollIntoView({ behavior: "smooth", block: "center" });
         setTimeout(() => {
           const fresh = document.querySelector<HTMLElement>(
             `[data-tour="${targetId}"]`
           );
           if (fresh) setRect(fresh.getBoundingClientRect());
-        }, 380);
+        }, 400);
       } else {
         setRect(r);
       }
-    }, 100);
+    }, 150);
 
     return () => clearTimeout(t);
-  }, [step, visible]); // dep on `step` only — always re-queries the DOM fresh
+  }, [step, visible]);
 
   // ── Confetti (last step) ──────────────────────────────────────────────────
   useEffect(() => {
@@ -196,31 +192,42 @@ export function OnboardingTour({ show }: { show: boolean }) {
 
   if (!visible) return null;
 
-  // A spotlight is shown only when we have a valid measured rect AND the
-  // current step actually has a target (guards against stale rect from prev step).
+  // Spotlight is shown only when rect is fresh AND the current step has a target.
+  // This guards against stale rect from a previous step leaking through.
   const hasTarget = rect !== null && currentStep.target !== null;
 
-  // Spotlight geometry (safe — only used when hasTarget is true)
-  const spotX = hasTarget ? rect!.left - PAD : 0;
-  const spotY = hasTarget ? rect!.top - PAD : 0;
-  const spotW = hasTarget ? rect!.width + PAD * 2 : 0;
+  // getBoundingClientRect() returns viewport-relative coords. The SVG overlay
+  // and tooltip card are both position:fixed, so their (0,0) is also the
+  // viewport top-left. We add window.scrollX/scrollY so the values remain
+  // correct when the page is scrolled and fixed-element layout is recalculated.
+  const scrollX = typeof window !== "undefined" ? window.scrollX : 0;
+  const scrollY = typeof window !== "undefined" ? window.scrollY : 0;
+
+  const spotX = hasTarget ? rect!.left + scrollX - PAD : 0;
+  const spotY = hasTarget ? rect!.top  + scrollY - PAD : 0;
+  const spotW = hasTarget ? rect!.width  + PAD * 2 : 0;
   const spotH = hasTarget ? rect!.height + PAD * 2 : 0;
 
-  // Tooltip placement
+  // Tooltip placement — prefer below for elements in the top half of the
+  // viewport, above for elements in the bottom half.
   const TOOLTIP_W = 320;
-  const TOOLTIP_H = 210; // approximate
+  const TOOLTIP_H = 210;
 
   let tooltipStyle: React.CSSProperties;
 
   if (hasTarget) {
-    const below = spotY + spotH + 16;
-    const above = spotY - TOOLTIP_H - 12;
-    const top =
-      below + TOOLTIP_H < winSize.h ? below : Math.max(8, above);
+    const elementCenterY = rect!.top + rect!.height / 2;
+    const inTopHalf = elementCenterY < winSize.h / 2;
+
+    const top = inTopHalf
+      ? spotY + spotH + 16                       // below the spotlight
+      : Math.max(8, spotY - TOOLTIP_H - 12);     // above the spotlight
+
     const left = Math.max(
       8,
       Math.min(spotX + spotW / 2 - TOOLTIP_W / 2, winSize.w - TOOLTIP_W - 8)
     );
+
     tooltipStyle = { top, left };
   } else {
     tooltipStyle = {
