@@ -11,8 +11,8 @@ const cormorant = Cormorant_Garamond({
 
 const LINES = [
   { text: "Your finances.", delay: "0s" },
-  { text: "Understood at a glance.", delay: "1.5s" },
-  { text: "AI-powered insights, zero noise.", delay: "3s" },
+  { text: "Understood at a glance.", delay: "0.8s" },
+  { text: "AI-powered insights, zero noise.", delay: "1.6s" },
 ];
 
 export function PitchSequence() {
@@ -54,7 +54,7 @@ export function PitchSequence() {
       <div
         style={{
           opacity: 0,
-          animation: "pitchFadeUp 1.2s ease 4.5s forwards",
+          animation: "pitchFadeUp 1.2s ease 2.4s forwards",
         }}
       >
         <span
@@ -70,7 +70,7 @@ export function PitchSequence() {
             WebkitTextFillColor: "transparent",
             backgroundClip: "text",
             display: "inline",
-            animation: "shimmerMove 5s linear 5.7s infinite",
+            animation: "shimmerMove 5s linear 3.6s infinite",
           }}
         >
           Reduvia.
@@ -86,7 +86,7 @@ export function PitchSequence() {
             marginLeft: "4px",
             verticalAlign: "middle",
             borderRadius: "1px",
-            animation: "cursorBlink 1.1s step-end 5.7s infinite",
+            animation: "cursorBlink 1.1s step-end 3.6s infinite",
           }}
         />
       </div>

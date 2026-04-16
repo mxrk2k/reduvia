@@ -2,13 +2,17 @@
 
 import { useEffect, useRef } from "react";
 
-// [r, g, b] tuples for soft smoke wisps
+// [r, g, b] tuples for smoke wisps
 const SMOKE_COLORS: [number, number, number][] = [
-  [70, 70, 75],   // dark grey
-  [55, 55, 68],   // blue-grey
-  [65, 48, 85],   // violet-grey
-  [45, 45, 55],   // deep grey
+  [100, 100, 108],  // mid grey
+  [80,  80,  100],  // blue-grey
+  [95,  70,  130],  // violet
+  [70,  70,   85],  // deep grey
+  [115, 100, 145],  // soft violet-white
 ];
+
+// Smoke only rises from the bottom up to this fraction of the viewport height
+const SMOKE_CEIL = 0.5;
 
 interface Particle {
   x: number;
@@ -25,15 +29,15 @@ interface Particle {
 }
 
 function createParticle(width: number, height: number): Particle {
-  const maxLife = 280 + Math.random() * 160;
+  const maxLife = 320 + Math.random() * 180;
   return {
     x: Math.random() * width,
     y: height + 20 + Math.random() * 40,
-    vx: (Math.random() - 0.5) * 0.35,
-    vy: -(0.25 + Math.random() * 0.45),
-    radius: 50 + Math.random() * 70,
+    vx: (Math.random() - 0.5) * 0.5,
+    vy: -(0.5 + Math.random() * 0.7),
+    radius: 80 + Math.random() * 100,
     opacity: 0,
-    maxOpacity: 0.055 + Math.random() * 0.07,
+    maxOpacity: 0.18 + Math.random() * 0.16,
     life: 0,
     maxLife,
     colorIndex: Math.floor(Math.random() * SMOKE_COLORS.length),
@@ -57,12 +61,13 @@ export function SmokeBackground() {
 
     const particles: Particle[] = [];
 
-    // Seed initial particles spread across the canvas
-    for (let i = 0; i < 14; i++) {
+    // Seed initial particles spread across the lower half
+    for (let i = 0; i < 22; i++) {
       const p = createParticle(width, height);
-      p.y = Math.random() * height;
-      p.life = Math.random() * p.maxLife * 0.6;
-      p.opacity = p.maxOpacity * 0.4;
+      // Distribute y between the ceiling and the bottom
+      p.y = height * SMOKE_CEIL + Math.random() * (height * (1 - SMOKE_CEIL));
+      p.life = Math.random() * p.maxLife * 0.55;
+      p.opacity = p.maxOpacity * 0.5;
       particles.push(p);
     }
 
@@ -73,8 +78,8 @@ export function SmokeBackground() {
       if (!ctx || !canvas) return;
       ctx.clearRect(0, 0, width, height);
 
-      // Spawn a new particle every ~450 ms
-      if (time - lastSpawn > 450) {
+      // Spawn a new particle every ~220 ms for a denser effect
+      if (time - lastSpawn > 220) {
         particles.push(createParticle(width, height));
         lastSpawn = time;
       }
@@ -82,20 +87,29 @@ export function SmokeBackground() {
       for (let i = particles.length - 1; i >= 0; i--) {
         const p = particles[i];
         p.life++;
-        p.wobble += 0.018;
-        p.x += p.vx + Math.sin(p.wobble) * 0.28;
+        p.wobble += 0.016;
+        p.x += p.vx + Math.sin(p.wobble) * 0.38;
         p.y += p.vy;
 
-        const ratio = p.life / p.maxLife;
-        if (ratio < 0.18) {
-          p.opacity = (ratio / 0.18) * p.maxOpacity;
-        } else if (ratio > 0.65) {
-          p.opacity = ((1 - ratio) / 0.35) * p.maxOpacity;
-        } else {
-          p.opacity = p.maxOpacity;
+        // Fade out as the particle approaches the ceiling
+        const ceilY = height * SMOKE_CEIL;
+        const fadeStart = ceilY + p.radius;
+        let ceilFade = 1;
+        if (p.y < fadeStart) {
+          ceilFade = Math.max(0, (p.y - ceilY) / p.radius);
         }
 
-        if (p.life >= p.maxLife || p.y < -p.radius) {
+        const ratio = p.life / p.maxLife;
+        if (ratio < 0.15) {
+          p.opacity = (ratio / 0.15) * p.maxOpacity * ceilFade;
+        } else if (ratio > 0.6) {
+          p.opacity = ((1 - ratio) / 0.4) * p.maxOpacity * ceilFade;
+        } else {
+          p.opacity = p.maxOpacity * ceilFade;
+        }
+
+        // Kill particle once it fully fades at the ceiling or exhausts its life
+        if (p.life >= p.maxLife || p.y < ceilY - p.radius) {
           particles.splice(i, 1);
           continue;
         }
