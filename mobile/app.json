@@ -27,26 +27,6 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": [
-      "./plugins/withAppGroup",
-      [
-        "@bacons/apple-targets",
-        {
-          "targets": [
-            {
-              "name": "FinanceWidget",
-              "type": "widget",
-              "bundleIdentifier": "com.reduvia.mobile.FinanceWidget",
-              "deploymentTarget": "16.0",
-              "sources": ["widgets/FinanceWidget.swift", "widgets/FinanceWidgetBundle.swift"],
-              "infoPlist": "widgets/Info.plist",
-              "entitlements": {
-                "com.apple.security.application-groups": ["group.com.reduvia.mobile"]
-              }
-            }
-          ]
-        }
-      ]
-    ]
+    "plugins": []
   }
 }
