@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X, LayoutDashboard, PiggyBank, Building2, Upload, ChevronRight, CreditCard, Zap, Home, Target } from "lucide-react";
+import { Menu, X, LayoutDashboard, PiggyBank, Building2, Upload, ChevronRight, CreditCard, Zap, Home, Target, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { BankAccountSummary } from "@/app/actions/bank-statements";
 
@@ -216,6 +216,17 @@ export function HamburgerMenu({ bankAccounts }: HamburgerMenuProps) {
               >
                 <CreditCard className="h-4 w-4 shrink-0" />
                 Billing
+              </Link>
+              <Link
+                href="/settings"
+                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                  pathname === "/settings"
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                }`}
+              >
+                <Settings className="h-4 w-4 shrink-0" />
+                Settings
               </Link>
             </div>
           </div>
