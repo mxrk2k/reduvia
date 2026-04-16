@@ -10,6 +10,7 @@ import { LogoutButton } from "./_components/logout-button";
 import { DueSoon } from "./_components/due-soon";
 import { HamburgerMenu } from "./_components/hamburger-menu";
 import { OnboardingPopup } from "./_components/onboarding-popup";
+import { OnboardingTour } from "@/components/onboarding-tour";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { DownloadAppButton } from "./_components/download-app-dialog";
 import { InsightsCard } from "@/components/insights-card";
@@ -75,6 +76,9 @@ export default async function DashboardPage() {
   const showOnboarding =
     bankAccounts.length === 0 && preferences?.dismiss_import_prompt !== true;
 
+  // Show guided onboarding tour for first-time users
+  const showTour = preferences?.onboarding_completed !== true;
+
   return (
     <div className="min-h-screen bg-muted/40">
       {/* Header */}
@@ -87,6 +91,7 @@ export default async function DashboardPage() {
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <Link
               href="/budgets"
+              data-tour="nav-budgets"
               className="text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[44px] sm:min-h-0 flex items-center"
             >
               Budgets
@@ -147,6 +152,9 @@ export default async function DashboardPage() {
 
       {/* Onboarding popup — client component, only mounts when needed */}
       <OnboardingPopup initialShow={showOnboarding} />
+
+      {/* Guided tour for first-time users */}
+      <OnboardingTour show={showTour} />
     </div>
   );
 }

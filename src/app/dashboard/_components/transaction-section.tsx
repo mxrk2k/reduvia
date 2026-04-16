@@ -122,7 +122,9 @@ export function TransactionSection({
             <Download className="mr-2 h-4 w-4" />
             Export CSV
           </Button>
-          <AddTransactionDialog triggerClassName="flex-1 min-h-[44px] sm:flex-none sm:min-h-0" />
+          <div data-tour="add-transaction">
+            <AddTransactionDialog triggerClassName="flex-1 min-h-[44px] sm:flex-none sm:min-h-0" />
+          </div>
         </div>
       </div>
 

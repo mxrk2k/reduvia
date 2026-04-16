@@ -8,6 +8,7 @@ import { SUPPORTED_CURRENCIES, DEFAULT_CURRENCY } from "@/lib/currencies";
 export interface UserPreferences {
   dismiss_import_prompt: boolean;
   preferred_currency: string;
+  onboarding_completed: boolean;
 }
 
 // ── getUserPreferences ─────────────────────────────────────────────────────────
@@ -22,7 +23,7 @@ export async function getUserPreferences(): Promise<UserPreferences | null> {
 
   const { data } = await supabase
     .from("user_preferences")
-    .select("dismiss_import_prompt, preferred_currency")
+    .select("dismiss_import_prompt, preferred_currency, onboarding_completed")
     .eq("user_id", user.id)
     .maybeSingle();
 
@@ -72,6 +73,29 @@ export async function updateUserCurrency(
     {
       user_id: user.id,
       preferred_currency: currency,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id" }
+  );
+
+  if (error) return { error: error.message };
+  return null;
+}
+
+// ── completeOnboarding ────────────────────────────────────────────────────────
+
+export async function completeOnboarding(): Promise<{ error: string } | null> {
+  const supabase = createClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+  if (authError || !user) return { error: "Not authenticated." };
+
+  const { error } = await supabase.from("user_preferences").upsert(
+    {
+      user_id: user.id,
+      onboarding_completed: true,
       updated_at: new Date().toISOString(),
     },
     { onConflict: "user_id" }

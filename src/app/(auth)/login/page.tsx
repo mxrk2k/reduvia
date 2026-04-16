@@ -32,14 +32,13 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 // ── Shared glass card style ───────────────────────────────────────────────────
 
 const glassStyle: React.CSSProperties = {
-  background: "rgba(9, 9, 30, 0.72)",
-  backdropFilter: "blur(22px)",
-  WebkitBackdropFilter: "blur(22px)",
-  border: "1px solid rgba(139, 92, 246, 0.22)",
+  background: "rgba(255,255,255,0.03)",
+  backdropFilter: "blur(24px)",
+  WebkitBackdropFilter: "blur(24px)",
+  border: "1px solid rgba(255,255,255,0.08)",
   boxShadow: [
-    "0 0 0 1px rgba(255,255,255,0.04) inset",
-    "0 0 60px rgba(139,92,246,0.08)",
-    "0 25px 60px rgba(0,0,0,0.65)",
+    "0 0 40px rgba(124,58,237,0.08)",
+    "0 25px 60px rgba(0,0,0,0.55)",
   ].join(", "),
 };
 

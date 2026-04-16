@@ -47,6 +47,7 @@ export function HamburgerMenu({ bankAccounts }: HamburgerMenuProps) {
         onClick={() => setOpen(true)}
         aria-label="Open navigation menu"
         aria-expanded={open}
+        data-tour="nav-hamburger"
       >
         <Menu className="h-5 w-5" />
       </Button>
