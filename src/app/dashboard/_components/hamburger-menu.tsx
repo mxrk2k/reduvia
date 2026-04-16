@@ -3,8 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X, LayoutDashboard, PiggyBank, Building2, Upload, ChevronRight, CreditCard, Zap, Home, Target, Settings } from "lucide-react";
+import { Menu, X, LayoutDashboard, PiggyBank, Building2, Upload, ChevronRight, CreditCard, Zap, Home, Target, Settings, Gift } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { InviteModal } from "@/components/invite-modal";
 import type { BankAccountSummary } from "@/app/actions/bank-statements";
 
 interface HamburgerMenuProps {
@@ -13,6 +14,7 @@ interface HamburgerMenuProps {
 
 export function HamburgerMenu({ bankAccounts }: HamburgerMenuProps) {
   const [open, setOpen] = useState(false);
+  const [showInvite, setShowInvite] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
 
@@ -184,6 +186,13 @@ export function HamburgerMenu({ bankAccounts }: HamburgerMenuProps) {
 
             {/* Bottom links */}
             <div className="border-t p-3 space-y-0.5">
+              <button
+                onClick={() => { setOpen(false); setShowInvite(true); }}
+                className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <Gift className="h-4 w-4 shrink-0" />
+                Invite Friends
+              </button>
               <Link
                 href="/import"
                 className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
@@ -232,6 +241,8 @@ export function HamburgerMenu({ bankAccounts }: HamburgerMenuProps) {
           </div>
         </>
       )}
+
+      <InviteModal open={showInvite} onOpenChange={setShowInvite} />
     </>
   );
 }

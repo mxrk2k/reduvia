@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -59,6 +59,15 @@ export default function SignupPage() {
   // Auth logic — unchanged
   const [serverError, setServerError] = useState<string | null>(null);
   const [verificationSent, setVerificationSent] = useState(false);
+
+  // Capture ?ref= from the invite link and persist it in a cookie so the
+  // auth callback can apply the referral after OAuth or email verification.
+  useEffect(() => {
+    const ref = new URLSearchParams(window.location.search).get("ref");
+    if (ref) {
+      document.cookie = `ref=${encodeURIComponent(ref)}; path=/; max-age=3600; SameSite=Lax`;
+    }
+  }, []);
 
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
