@@ -56,7 +56,7 @@ export function InviteModal({ open, onOpenChange }: InviteModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-[500px] p-6">
         <DialogHeader>
           <div className="flex items-center gap-2">
             <Gift className="h-5 w-5 text-primary" />
@@ -72,20 +72,22 @@ export function InviteModal({ open, onOpenChange }: InviteModalProps) {
             <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-5">
             {/* Referral link */}
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               <p className="text-xs font-medium text-muted-foreground">
                 Your invite link
               </p>
-              <div className="flex gap-2">
-                <div className="flex-1 truncate rounded-lg border bg-muted/50 px-3 py-2 font-mono text-xs text-foreground">
-                  {referralLink}
+              <div className="flex items-center gap-2">
+                {/* min-w-0 lets the flex child shrink below its content width so truncate works */}
+                <div className="flex-1 min-w-0 rounded-lg border bg-muted/50 px-3 py-2 font-mono text-xs text-foreground truncate">
+                  {referralLink || "Generating link…"}
                 </div>
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={handleCopy}
+                  disabled={!referralLink}
                   className="shrink-0 gap-1.5"
                 >
                   {copied ? (
@@ -99,18 +101,18 @@ export function InviteModal({ open, onOpenChange }: InviteModalProps) {
             </div>
 
             {/* Stats */}
-            <div className="flex gap-3">
-              <div className="flex-1 rounded-lg border bg-muted/30 p-3 text-center">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-lg border bg-muted/30 p-4 text-center">
                 <p className="text-2xl font-bold tabular-nums">
                   {stats?.invited ?? 0}
                 </p>
-                <p className="text-xs text-muted-foreground">Friends invited</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">Friends invited</p>
               </div>
-              <div className="flex-1 rounded-lg border bg-muted/30 p-3 text-center">
+              <div className="rounded-lg border bg-muted/30 p-4 text-center">
                 <p className="text-2xl font-bold tabular-nums">
                   {stats?.completed ?? 0}
                 </p>
-                <p className="text-xs text-muted-foreground">Signed up</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">Signed up</p>
               </div>
             </div>
           </div>
