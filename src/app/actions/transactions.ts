@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { isProUser } from "@/lib/stripe";
 import { captureServerEvent } from "@/lib/posthog";
@@ -8,6 +9,23 @@ import type { TransactionType, TransactionCategory, RecurringFrequency } from "@
 import type { RecurringSuggestion } from "@/app/actions/insights";
 
 type ActionResult = { error: string } | null;
+
+// ── Validation ────────────────────────────────────────────────────────────────
+
+const TRANSACTION_CATEGORIES = [
+  "salary", "freelance", "investment", "gift",
+  "housing", "food", "transport", "entertainment",
+  "health", "education", "shopping", "utilities", "other",
+] as const;
+
+const addTransactionSchema = z.object({
+  type:                z.enum(["income", "expense"]),
+  amount:              z.number().positive("Amount must be a positive number"),
+  category:            z.enum(TRANSACTION_CATEGORIES, { error: "Invalid category" }),
+  description:         z.string().max(500, "Description must be under 500 characters"),
+  is_recurring:        z.boolean().optional(),
+  recurring_frequency: z.enum(["weekly", "monthly", "yearly"]).optional(),
+});
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
