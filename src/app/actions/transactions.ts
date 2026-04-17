@@ -64,6 +64,11 @@ export async function addTransaction(data: {
   is_recurring?: boolean;
   recurring_frequency?: RecurringFrequency;
 }): Promise<ActionResult> {
+  const parsed = addTransactionSchema.safeParse(data);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+
   const supabase = createClient();
   const {
     data: { user },
